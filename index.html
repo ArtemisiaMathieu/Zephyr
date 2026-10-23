@@ -1,0 +1,1543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zephyr">
+<meta name="theme-color" content="#11161f">
+<title>Zephyr</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&display=swap">
+<style>
+/* Layout: one column like an instrument panel. Status and one large control up top, the manuscript below, a fixed tab bar for the desk-side views. */
+:root{
+  --bg:#11161f; --panel:#192030; --raise:#232c3e; --ink:#ece6d9; --muted:#8e97aa; --line:#2c3648;
+  --amber:#f1a73c; --on-amber:#1d1307; --listen:#73aef0; --speak:#62c592; --alert:#ec6a5e;
+  --ui:"Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --read:"Literata", Georgia, "Times New Roman", serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#eceff3; --panel:#ffffff; --raise:#f2f4f7; --ink:#1a2030; --muted:#5a6375; --line:#d2d7e0;
+    --amber:#a85b0c; --on-amber:#ffffff; --listen:#2b67ad; --speak:#1f7f52; --alert:#bd3a2f;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#eceff3; --panel:#ffffff; --raise:#f2f4f7; --ink:#1a2030; --muted:#5a6375; --line:#d2d7e0;
+  --amber:#a85b0c; --on-amber:#ffffff; --listen:#2b67ad; --speak:#1f7f52; --alert:#bd3a2f;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 var(--ui);-webkit-text-size-adjust:100%}
+.app{max-width:760px;margin:0 auto;min-height:100%;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--listen);outline-offset:2px}
+
+.top{display:flex;align-items:baseline;gap:12px;padding-block:16px 12px;border-bottom:1px solid var(--line)}
+.brand{font-weight:700;letter-spacing:.16em;text-transform:uppercase;font-size:.8rem;color:var(--amber)}
+.doc-title{font-family:var(--read);font-size:1.15rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wc{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.console{display:grid;gap:16px;padding-block:18px 8px}
+.status{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+.pill{display:inline-flex;align-items:center;gap:9px;padding:6px 14px;border-radius:999px;background:var(--raise);font-weight:700;font-size:.95rem}
+.pill::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.pill[data-state="listen"]::before{background:var(--listen)}
+.pill[data-state="await"]::before{background:var(--listen);animation:pulse .9s infinite}
+.pill[data-state="draft"]::before{background:var(--amber)}
+.pill[data-state="speaking"]::before{background:var(--speak)}
+.pill[data-state="thinking"]::before{background:var(--amber);animation:pulse 1.1s infinite}
+.session-info{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums}
+
+.mic{appearance:none;border:2px solid var(--line);background:var(--panel);border-radius:22px;min-height:108px;
+  font-weight:700;font-size:1.4rem;display:flex;align-items:center;justify-content:center;gap:14px;cursor:pointer;width:100%}
+.mic[aria-pressed="true"]{border-color:var(--listen)}
+.mic[data-state="draft"]{background:var(--amber);color:var(--on-amber);border-color:var(--amber)}
+.mic-dot{width:18px;height:18px;border-radius:50%;background:var(--muted);flex:none}
+.mic[aria-pressed="true"] .mic-dot{background:var(--listen);animation:pulse 1.6s infinite}
+.mic[data-state="draft"] .mic-dot{background:var(--on-amber)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+
+.lines{display:grid;gap:10px}
+.line{margin:0;display:grid;grid-template-columns:4.4rem 1fr;gap:10px;align-items:baseline}
+.who{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.said{min-width:0;font-size:1.05rem;overflow-wrap:anywhere}
+.said.dim{color:var(--muted)}
+
+.sugg{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.sugg h3{margin:0 0 6px;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.sugg ol{margin:0;padding-left:1.3rem;display:grid;gap:6px}
+
+.typecmd{display:flex;gap:8px}
+.typecmd input{flex:1;min-width:0}
+
+input[type="text"],input[type="password"],input:not([type]),select{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+.btn{appearance:none;border:1px solid var(--line);background:var(--raise);border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--amber);border-color:var(--amber);color:var(--on-amber)}
+.btn.danger{color:var(--alert)}
+.btn.small{padding:6px 10px;font-size:.88rem}
+
+.manuscript{display:grid;gap:8px;padding-block:14px 8px}
+.eyebrow{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.ms-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{appearance:none;border:0;background:var(--panel);padding:7px 12px;font-weight:700;font-size:.88rem;color:var(--muted);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--raise);color:var(--ink)}
+.rendered{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-height:46vh;
+  font-family:var(--read);font-size:1.08rem;line-height:1.75;overflow-wrap:anywhere}
+.rendered > :first-child{margin-top:0}
+.rendered p{margin:0 0 1em;max-width:66ch}
+.rendered .m-title{font-size:1.9rem;line-height:1.2;font-weight:600;margin:0 0 .6em;text-wrap:balance}
+.rendered .m-h{line-height:1.3;font-weight:600;margin:1.3em 0 .5em;text-wrap:balance}
+.rendered h2.m-h{font-size:1.5rem}.rendered h3.m-h{font-size:1.28rem}.rendered h4.m-h{font-size:1.12rem}
+.rendered h5.m-h{font-size:1rem;font-family:var(--ui);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rendered ul,.rendered ol{margin:0 0 1em;padding-left:1.4em;max-width:66ch}
+.rendered li{margin-bottom:.3em}
+.rendered u{text-underline-offset:3px}
+.pending{color:var(--muted);font-family:var(--ui);font-size:.9rem;font-style:italic;font-weight:400;text-transform:none;letter-spacing:0}
+#docText{width:100%;min-height:46vh;resize:vertical;background:var(--panel);border:1px solid var(--line);border-radius:14px;
+  padding:18px;font-family:var(--read);font-size:1.08rem;line-height:1.75}
+
+.view h2{font-size:1.25rem;margin:22px 0 6px}
+.view p.note{color:var(--muted);margin:0 0 14px;max-width:62ch}
+.field{display:grid;gap:6px;margin-bottom:16px}
+.field label{font-weight:700}
+.field small{color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.list{list-style:none;margin:12px 0 0;padding:0;border-top:1px solid var(--line)}
+.list > li{padding-block:12px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.list .meta{min-width:0;flex:1}
+.list .t{font-family:var(--read);font-size:1.05rem}
+.list .s{color:var(--muted);font-size:.86rem;font-variant-numeric:tabular-nums}
+.current-tag{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);font-weight:700;margin-left:6px}
+
+details.sess{border-bottom:1px solid var(--line);padding-block:10px}
+details.sess > summary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+details.sess > summary::-webkit-details-marker{display:none}
+details.ver{margin:8px 0 0 12px;padding-left:12px;border-left:2px solid var(--line)}
+details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-variant-numeric:tabular-nums}
+.ver pre{white-space:pre-wrap;font-family:var(--read);font-size:.95rem;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;max-height:40vh;overflow:auto}
+.expires{color:var(--muted);font-size:.85rem}
+
+.cmds{overflow-x:auto}
+.cmds table{border-collapse:collapse;width:100%;min-width:480px}
+.cmds th,.cmds td{text-align:left;vertical-align:top;padding:10px 8px;border-bottom:1px solid var(--line)}
+.cmds th{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.cmds tbody th{padding-top:22px;color:var(--amber)}
+.cmds td:first-child{font-weight:700;white-space:nowrap;color:var(--amber)}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--panel);border-top:1px solid var(--line);z-index:5;
+  padding-bottom:env(safe-area-inset-bottom,0px);padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px))}
+.tabs .in{max-width:760px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.tabs button{appearance:none;background:none;border:0;padding:14px 4px;font-weight:700;font-size:.9rem;color:var(--muted);cursor:pointer}
+.tabs button[aria-current="page"]{color:var(--amber)}
+.confirm{color:var(--alert);font-weight:700}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <span class="brand">Zephyr</span>
+    <span id="docTitle" class="doc-title">Untitled draft</span>
+    <span id="wc" class="wc">0 words</span>
+  </header>
+
+  <main>
+    <!-- WRITE -->
+    <section id="v-write" class="view">
+      <div class="console">
+        <div class="status">
+          <span id="pill" class="pill" data-state="off">Not listening</span>
+          <span id="sessionInfo" class="session-info">No session open</span>
+        </div>
+        <button id="mic" class="mic" aria-pressed="false" type="button"><span class="mic-dot"></span><span id="micLabel">Start listening</span></button>
+        <div class="lines" aria-live="polite">
+          <p class="line"><span class="who">Heard</span><span id="heard" class="said dim">Tap Start listening and start talking.</span></p>
+          <p class="line"><span class="who">Zephyr</span><span id="oscarSaid" class="said"></span></p>
+        </div>
+        <div id="sugg" class="sugg" hidden>
+          <h3>Suggestions</h3>
+          <ol id="suggList"></ol>
+        </div>
+        <form id="typeCmd" class="typecmd" autocomplete="off">
+          <label for="cmdInput" class="sr">Type a command</label>
+          <input id="cmdInput" placeholder="Or type one: Zephyr read last paragraph">
+          <button class="btn" type="submit">Send</button>
+        </form>
+      </div>
+      <div class="manuscript">
+        <div class="ms-head">
+          <span class="eyebrow">Manuscript</span>
+          <div class="seg" role="group" aria-label="Manuscript view">
+            <button type="button" id="viewFormatted" aria-pressed="true">Formatted</button>
+            <button type="button" id="viewRaw" aria-pressed="false">Edit text</button>
+          </div>
+        </div>
+        <div id="docView" class="rendered"></div>
+        <label for="docText" class="sr">Manuscript text</label>
+        <textarea hidden id="docText" spellcheck="true" placeholder="Say “Zephyr compose” and start talking, or say “Zephyr add to manuscript” after you speak. You can also type here when you’re parked."></textarea>
+      </div>
+    </section>
+
+    <!-- DOCUMENTS -->
+    <section id="v-docs" class="view" hidden>
+      <h2>Current document</h2>
+      <div class="field">
+        <label for="titleInput">Title</label>
+        <input id="titleInput" type="text">
+      </div>
+      <div class="row">
+        <button class="btn primary" id="btnEnd" type="button">End session and save</button>
+        <button class="btn" id="btnCopyFmt" type="button" data-label="Copy formatted">Copy formatted</button>
+        <button class="btn" id="btnCopy" type="button">Copy text</button>
+        <button class="btn" id="btnTxt" type="button">Download .txt</button>
+        <button class="btn" id="btnFromCurrent" type="button">New from this</button>
+        <button class="btn" id="btnBlank" type="button">New blank</button>
+      </div>
+      <h2>All documents</h2>
+      <p class="note">Each document keeps the draft saved at the end of its last session.</p>
+      <ul id="docList" class="list"></ul>
+    </section>
+
+    <!-- ARCHIVE -->
+    <section id="v-archive" class="view" hidden>
+      <h2>Session autosaves</h2>
+      <p class="note">Zephyr autosaves every change during a session. When you say “Zephyr end session,” those autosaves move here for seven days, then they are deleted. The draft saved at the end of the session stays in Documents.</p>
+      <div id="archiveList"></div>
+    </section>
+
+    <!-- COMMANDS -->
+    <section id="v-cmds" class="view" hidden>
+      <h2>Voice commands</h2>
+      <p class="note">Start every command with “Zephyr.” If you pause after “Zephyr,” you’ll hear a tone, then say the command.</p>
+      <div class="cmds">
+        <table>
+          <thead><tr><th>Say</th><th>What happens</th></tr></thead>
+          <tbody>
+            <tr><td>Zephyr compose</td><td>Start writing. Everything you say goes into the manuscript, except anything that starts with “Zephyr,” until you say “Zephyr pause.” Say “period,” “comma,” “question mark,” “new paragraph,” “open quote,” “close quote.”</td></tr>
+            <tr><td>Zephyr pause</td><td>Stop composing. Zephyr keeps listening for commands.</td></tr>
+            <tr><td>Zephyr add to manuscript</td><td>When you’re not composing, add everything you’ve said since your last command. Also “Zephyr add that.”</td></tr>
+            <tr><td>Zephyr new paragraph</td><td>Start a new paragraph. In a list, starts the next item; say it twice to end the list. While composing you can also just say “new paragraph.”</td></tr>
+            <tr><td>Zephyr new line</td><td>Start a new line in the same paragraph, or the next list item.</td></tr>
+            <tr><td>Zephyr scratch that</td><td>Remove the last thing you dictated.</td></tr>
+            <tr><td>Zephyr read</td><td>Read the whole document. Also: “read last paragraph,” “read last sentence,” “read paragraph three,” “read last two paragraphs.”</td></tr>
+            <tr><td>Zephyr edit …</td><td>Make a change. “Zephyr edit cut the second sentence of the last paragraph.” “Zephyr change ‘cold’ to ‘bitter’ in the opening.”</td></tr>
+            <tr><td>Zephyr feedback</td><td>Hear feedback and numbered suggestions. Add a focus: “Zephyr feedback on pacing.”</td></tr>
+            <tr><td>Zephyr apply suggestion 2</td><td>Make that suggested edit. Also “apply suggestions one and three” or “apply all.”</td></tr>
+            <tr><td>Zephyr explain …</td><td>Ask how to edit. “Zephyr explain how to tighten a long opening.” Questions work too: “Zephyr how do I show this instead of telling it?”</td></tr>
+            <tr><td>Zephyr undo</td><td>Undo the last change this session. Also “undo all” and “redo.”</td></tr>
+            <tr><td>Zephyr create new</td><td>Save this document and start a new one that begins with a copy of it. “Create new blank” starts empty.</td></tr>
+            <tr><td>Zephyr rename …</td><td>Rename the current document. Also “Zephyr call it …”</td></tr>
+            <tr><td>Zephyr open …</td><td>Switch documents by name. “Zephyr list documents” reads the names.</td></tr>
+            <tr><th colspan="2">Formatting</th></tr>
+            <tr><td>Zephyr title</td><td>Make the current paragraph the title. With words after it, adds a new title line: “Zephyr title, The Long Road North.”</td></tr>
+            <tr><td>Zephyr heading one</td><td>Heading 1. Also heading two, three and four. Add words to create the heading: “Zephyr heading two, chapter one.”</td></tr>
+            <tr><td>Zephyr normal text</td><td>Turn the current heading or list item back into an ordinary paragraph.</td></tr>
+            <tr><td>Zephyr bulleted list</td><td>Make the current paragraph a bullet, or start a list for your next words. Say “new paragraph” for the next bullet.</td></tr>
+            <tr><td>Zephyr numbered list</td><td>Same as bulleted list, with numbers.</td></tr>
+            <tr><td>Zephyr end list</td><td>Finish a list and go back to normal paragraphs.</td></tr>
+            <tr><td>Zephyr bold …</td><td>Bold part of the text: “Zephyr bold that,” “Zephyr bold last sentence,” “Zephyr bold last three words,” “Zephyr bold the words cold river.” Also “Zephyr make that bold.”</td></tr>
+            <tr><td>Zephyr italic …</td><td>Same targets as bold.</td></tr>
+            <tr><td>Zephyr underline …</td><td>Same targets as bold.</td></tr>
+            <tr><td>Zephyr bold on</td><td>Everything you say next is bold until “Zephyr bold off.” Works for italic and underline too.</td></tr>
+            <tr><td>Zephyr remove bold …</td><td>Take bold off that, the last sentence, or named words. “Zephyr remove formatting” clears bold, italic and underline.</td></tr>
+            <tr><td>Zephyr formatting help</td><td>Hear the formatting commands.</td></tr>
+            <tr><th colspan="2">Other</th></tr>
+            <tr><td>Zephyr word count</td><td>Hear the length.</td></tr>
+            <tr><td>Zephyr repeat</td><td>Hear Zephyr’s last answer again.</td></tr>
+            <tr><td>Zephyr back up</td><td>Send the current draft to Google Drive right now. Zephyr also backs up on its own every couple of minutes and at the end of each session.</td></tr>
+            <tr><td>Zephyr stop</td><td>Silence Zephyr, cancel a request in progress, or pause composing.</td></tr>
+            <tr><td>Zephyr end session</td><td>Save the draft, archive this session’s autosaves for one week, and stop listening.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="v-settings" class="view" hidden>
+      <h2>Settings</h2>
+      <div class="field">
+        <label for="apiKey">Claude API key</label>
+        <input id="apiKey" type="password" placeholder="sk-ant-…" autocomplete="off">
+        <small>Needed for edit, feedback and explain. It stays in this browser on this phone and is sent only to Anthropic.</small>
+      </div>
+      <div class="field">
+        <label for="model">Model</label>
+        <select id="model">
+          <option value="claude-sonnet-5-5">Claude Sonnet 5.5 (balanced)</option>
+          <option value="claude-opus-5-5">Claude Opus 5.5 (strongest, slower)</option>
+          <option value="claude-haiku-5-5">Claude Haiku 5.5 (fastest)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="lang">Language</label>
+        <select id="lang">
+          <option value="en-US">English (US)</option>
+          <option value="en-GB">English (UK)</option>
+          <option value="en-CA">English (Canada)</option>
+          <option value="en-AU">English (Australia)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="voice">Zephyr’s voice</label>
+        <select id="voice"><option value="">Phone default</option></select>
+      </div>
+      <div class="field">
+        <label for="rate">Speaking speed: <span id="rateVal">1.0</span>×</label>
+        <input id="rate" type="range" min="0.7" max="1.6" step="0.05" value="1">
+      </div>
+      <div class="field">
+        <label><input id="lwt" type="checkbox" checked> Listen while Zephyr talks</label>
+        <small>Lets you say “Zephyr stop” in the middle of a read-back. If Zephyr hears itself through the car speakers, turn this off.</small>
+      </div>
+      <div class="field">
+        <label><input id="autoPunct" type="checkbox" checked> Fix punctuation and capitals as I compose</label>
+        <small>A few seconds after you pause, Claude adds punctuation and fixes capital letters in what you just said. It never changes your words. Needs the API key above.</small>
+      </div>
+      <div class="row"><button class="btn" id="btnTestVoice" type="button">Test voice</button></div>
+
+      <h2>Google Drive backup</h2>
+      <p class="note">Zephyr sends the working draft to Drive every couple of minutes while you write, and the saved draft at the end of each session. Saved drafts become Google Docs in a Zephyr folder. Session backups go to Zephyr › Session backups and are deleted after seven days.</p>
+      <div class="field">
+        <label for="bkUrl">Backup web app URL</label>
+        <input id="bkUrl" type="text" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="bkSecret">Backup secret</label>
+        <input id="bkSecret" type="password" placeholder="The same phrase you put in the script" autocomplete="off">
+      </div>
+      <div class="row">
+        <button class="btn" id="btnBkTest" type="button">Test connection</button>
+        <button class="btn" id="btnBkNow" type="button">Back up now</button>
+      </div>
+      <p class="note" id="bkStatus" style="margin-top:10px">Not set up.</p>
+    </section>
+  </main>
+
+  <nav class="tabs" aria-label="Views">
+    <div class="in">
+      <button type="button" data-view="v-write" aria-current="page">Write</button>
+      <button type="button" data-view="v-docs">Docs</button>
+      <button type="button" data-view="v-archive">Archive</button>
+      <button type="button" data-view="v-cmds">Commands</button>
+      <button type="button" data-view="v-settings">Settings</button>
+    </div>
+  </nav>
+</div>
+
+<script>
+'use strict';
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+const WEEK = 7 * 24 * 3600 * 1000;
+const API = 'https://api.anthropic.com/v1/messages';
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const plain = t => String(t || '').replace(/^(?:%|#{1,4}|[-*]|\d+[.)])(?:[ \t]+|$)/gm, '').replace(/\*+|\+\+/g, '');
+const words = t => (plain(t).match(/\S+/g) || []).length;
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtTime = t => new Date(t).toLocaleTimeString([], {hour: 'numeric', minute: '2-digit'});
+const fmtDate = t => new Date(t).toLocaleDateString([], {weekday: 'short', month: 'short', day: 'numeric'});
+const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const short = s => { s = String(s).trim(); return s.length > 60 ? s.slice(0, 57) + '…' : s; };
+const NUMS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,
+  first:1,second:2,third:3,fourth:4,fifth:5,sixth:6,seventh:7,eighth:8,ninth:9,tenth:10,to:2,too:2,for:4,won:1};
+const num = w => { if (!w) return null; const n = parseInt(w, 10); if (!isNaN(n)) return n; return NUMS[String(w).toLowerCase()] || null; };
+const paragraphs = t => String(t).split(/\n+/).map(p => p.trim()).filter(Boolean);
+const sentences = t => (String(t).replace(/\n+/g, ' ').match(/[^.!?…]+[.!?…]+["”’)\]]*|[^.!?…]+$/g) || []).map(s => s.trim()).filter(Boolean);
+const clean = s => String(s || '').replace(/<[^>]+>/g, ' ').replace(/[*_#`>]+/g, '').replace(/\s+/g, ' ').trim();
+function tag(s, name) { const m = String(s).match(new RegExp('<' + name + '>([\\s\\S]*?)</' + name + '>')); return m ? m[1].trim() : null; }
+const trimNL = s => s.replace(/^\n/, '').replace(/\n$/, '');
+
+/* ================= storage (IndexedDB) ================= */
+let dbp = null;
+function idb() {
+  if (!dbp) dbp = new Promise((res, rej) => {
+    const r = indexedDB.open('oscar', 1);
+    r.onupgradeneeded = () => {
+      const d = r.result;
+      d.createObjectStore('docs', {keyPath: 'id'});
+      d.createObjectStore('sessions', {keyPath: 'id'});
+      d.createObjectStore('kv');
+    };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return dbp;
+}
+const rq = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+async function os(name, mode) { const d = await idb(); return d.transaction(name, mode || 'readonly').objectStore(name); }
+const DB = {
+  get: async (s, k) => rq((await os(s)).get(k)),
+  all: async s => rq((await os(s)).getAll()),
+  put: async (s, v, k) => { const copy = JSON.parse(JSON.stringify(v)); const st = await os(s, 'readwrite'); return rq(k === undefined ? st.put(copy) : st.put(copy, k)); },
+  del: async (s, k) => rq((await os(s, 'readwrite')).delete(k))
+};
+
+/* ================= state ================= */
+const S = {
+  doc: null, text: '', session: null, undo: [], redo: [],
+  mode: 'idle', busy: false, unsaved: [], inline: {b: false, i: false, u: false}, lastPolished: '', speaking: false, awaiting: null,
+  lastSpoken: '', echo: '', speechEnd: 0, lastRead: '', lastChunk: null,
+  lastFinal: '', lastFinalAt: 0, suggestions: [], abort: null,
+  settings: {apiKey: '', model: 'claude-sonnet-5-5', lang: 'en-US', voice: '', rate: 1, listenWhileTalking: true, backupUrl: '', backupSecret: '', autoPunct: true}
+};
+let saveQ = Promise.resolve();
+function saveSession() {
+  if (!S.session) return saveQ;
+  const snap = JSON.parse(JSON.stringify(S.session));
+  saveQ = saveQ.then(() => DB.put('sessions', snap)).catch(() => {});
+  return saveQ;
+}
+function saveSettings() { DB.put('kv', S.settings, 'settings').catch(() => {}); }
+
+/* ================= sessions & documents ================= */
+function startSession() {
+  S.session = {id: uid(), docId: S.doc.id, docTitle: S.doc.title, startedAt: Date.now(), endedAt: null,
+    versions: [{t: Date.now(), label: 'Session start', text: S.text}]};
+  S.undo = []; S.redo = [];
+  saveSession();
+  saveQ = saveQ.then(() => DB.put('kv', S.session.id, 'activeSession')).catch(() => {});
+}
+const COALESCE = new Set(['Dictation', 'Typed change']);
+function autosave(label) {
+  if (!S.session) return;
+  const v = S.session.versions, last = v[v.length - 1], now = Date.now();
+  if (last && label === 'Punctuation') { last.text = S.text; }
+  else if (last && COALESCE.has(label) && last.label === label && now - last.t < 60000) { last.text = S.text; last.t = now; }
+  else v.push({t: now, label, text: S.text});
+  saveSession();
+  queueBackup('s_' + S.session.id, sessionPayload(false));
+}
+function setText(next, label, opts = {}) {
+  if (next === S.text) return;
+  if (!S.session) startSession();
+  if (opts.undoable !== false) {
+    const top = S.undo[S.undo.length - 1];
+    if (opts.coalesce && top && top.label === label && Date.now() - top.t < 5000) top.t = Date.now();
+    else S.undo.push({text: S.text, label, t: Date.now()});
+    S.redo = [];
+  }
+  S.text = next;
+  autosave(label);
+  render(opts.fromTextarea);
+}
+async function endSession({announce = true, stop = true} = {}) {
+  if (!S.session) {
+    if (announce) await say('There is no open session. Your saved draft is safe.');
+    if (stop) stopListening();
+    return;
+  }
+  S.doc.text = S.text; S.doc.updatedAt = Date.now();
+  await DB.put('docs', S.doc);
+  const n = S.session.versions.length;
+  S.session.endedAt = Date.now(); S.session.docTitle = S.doc.title; S.session.finalWords = words(S.text);
+  await saveSession();
+  queueBackup('d_' + S.doc.id, docPayload(S.doc), 0);
+  queueBackup('s_' + S.session.id, sessionPayload(true), 0);
+  const backupDone = backupOn() ? flushBackups() : null;
+  await DB.put('kv', null, 'activeSession');
+  S.session = null; S.undo = []; S.redo = []; S.mode = 'idle';
+  render(); renderDocs(); renderArchive();
+  if (announce) await say(`Session ended. I saved ${words(S.text)} words to ${S.doc.title}. ${n} autosave${n === 1 ? '' : 's'} are archived for one week.`);
+  if (backupDone) { const ok = await backupDone; if (announce) await say(ok ? 'Backed up to Google Drive.' : 'The Google Drive backup will finish once you have signal.'); }
+  if (stop) stopListening();
+}
+async function createDoc(title, text) {
+  const d = {id: uid(), title, text: text || '', createdAt: Date.now(), updatedAt: Date.now()};
+  await DB.put('docs', d);
+  queueBackup('d_' + d.id, docPayload(d), 5000);
+  return d;
+}
+async function openDoc(doc) {
+  if (S.session && S.session.docId !== doc.id) await endSession({announce: false, stop: false});
+  S.doc = doc; S.text = doc.text || ''; S.suggestions = []; S.lastChunk = null;
+  DB.put('kv', doc.id, 'lastDoc').catch(() => {});
+  render(); renderDocs();
+}
+async function createNew(blank) {
+  const base = S.doc.title, text = S.text;
+  await endSession({announce: false, stop: false});
+  const d = await createDoc(blank ? 'Untitled draft' : `${base} (new)`, blank ? '' : text);
+  await openDoc(d);
+  say(blank ? `Saved ${base}. Started a blank document.`
+            : `Saved ${base}, and made a new document from it called ${d.title}. You're working in the new one now.`);
+}
+async function rename(name) {
+  name = String(name).replace(/[.!?]+$/, '').trim();
+  if (!name) return say('What should I call it?');
+  name = name.replace(/\b\w/g, c => c.toUpperCase());
+  S.doc.title = name;
+  await DB.put('docs', S.doc);
+  queueBackup('d_' + S.doc.id, docPayload(S.doc), 5000);
+  if (S.session) { S.session.docTitle = name; saveSession(); }
+  render(); renderDocs();
+  say(`Renamed to ${name}.`);
+}
+async function purgeArchives() {
+  const all = await DB.all('sessions');
+  const now = Date.now();
+  for (const s of all) if (s.endedAt && now - s.endedAt > WEEK) await DB.del('sessions', s.id);
+}
+
+/* ================= undo / scratch ================= */
+function undo() {
+  const top = S.undo.pop();
+  if (!top) return say('Nothing to undo this session.');
+  S.redo.push({text: S.text, label: top.label});
+  S.text = top.text; autosave('Undo'); render();
+  say(`Undid ${top.label.toLowerCase()}.`);
+}
+function redo() {
+  const top = S.redo.pop();
+  if (!top) return say('Nothing to redo.');
+  S.undo.push({text: S.text, label: top.label, t: Date.now()});
+  S.text = top.text; autosave('Redo'); render();
+  say(`Redid ${top.label.toLowerCase()}.`);
+}
+function undoAll() {
+  if (!S.session) return say('Nothing to undo this session.');
+  const start = S.session.versions[0].text;
+  if (start === S.text) return say('The document already matches the start of this session.');
+  setText(start, 'Undo all');
+  say('Back to how the document was at the start of this session. Say Zephyr undo to bring the changes back.');
+}
+function removeLastSentence(t) {
+  const trimmed = t.replace(/\s+$/, '');
+  const body = trimmed.replace(/[.!?…]["”’)\]]*$/, '');
+  const i = Math.max(body.lastIndexOf('. '), body.lastIndexOf('? '), body.lastIndexOf('! '), body.lastIndexOf('\n'));
+  if (i < 0) return '';
+  return trimmed.slice(0, i + 1).replace(/\s+$/, '');
+}
+function scratch() {
+  if (S.lastChunk && S.text === S.lastChunk.after) {
+    setText(S.lastChunk.before, 'Scratch that'); S.lastChunk = null; beep('down'); return;
+  }
+  if (!S.text.trim()) return say('Nothing to scratch.');
+  setText(removeLastSentence(S.text), 'Scratch that');
+  say('Removed the last sentence.');
+}
+
+/* ================= dictation ================= */
+const PARA = '\uE000', LINE = '\uE001';
+const PUNCT = [
+  [/\s*\b(?:new|next) paragraph\b[\s,.]*/gi, ' ' + PARA + ' '],
+  [/\s*\b(?:new|next) line\b[\s,.]*/gi, ' ' + LINE + ' '],
+  [/\s*\b(?:period|full stop)\b/gi, '.'],
+  [/\s*\bcomma\b/gi, ','],
+  [/\s*\bquestion mark\b/gi, '?'],
+  [/\s*\bexclamation (?:point|mark)\b/gi, '!'],
+  [/\s*\bsemicolon\b/gi, ';'],
+  [/\s*\bcolon\b/gi, ':'],
+  [/\s*\b(?:em dash|dash)\b\s*/gi, ' — '],
+  [/\s*\b(?:ellipsis|dot dot dot)\b/gi, '…'],
+  [/\bopen quote\b\s*/gi, '“'],
+  [/\s*\b(?:close|end) quote\b/gi, '”']
+];
+const MARK_END = /(?:^|\n)(?:%|#{1,4}|[-*]|\d+[.)])[ \t]*$/;
+function formatDictation(raw) {
+  let s = ' ' + raw + ' ';
+  for (const [re, rep] of PUNCT) s = s.replace(re, rep);
+  s = s.replace(/[ \t]+/g, ' ').replace(/ +([.,;:?!…”])/g, '$1').replace(/“ +/g, '“');
+  s = s.replace(/([.?!…]["”’]?\s+)([a-z])/g, (m, a, b) => a + b.toUpperCase());
+  return s.trim();
+}
+const sentenceStart = prev => !prev.trim() || /([.?!…]["”’)]?|\n)\s*$/.test(prev) || MARK_END.test(prev);
+const capFirst = s => s.replace(/^([“"(]*)([a-z])/, (m, a, b) => a + b.toUpperCase());
+// A capitalised word mid-sentence is kept only if it is "I" or a name already used mid-sentence in the manuscript.
+function keepCap(prev, w) { return /^I(?:['’]|$)/.test(w) || new RegExp('[a-z0-9,;:—]\\s+' + escRe(w) + '\\b').test(prev); }
+function wrapInline(add, f) {
+  const open = (f.b ? '**' : '') + (f.i ? '*' : '') + (f.u ? '++' : '');
+  const close = (f.u ? '++' : '') + (f.i ? '*' : '') + (f.b ? '**' : '');
+  const m = add.match(/^([\s\S]*?)([.,;:?!…”"]*)$/);
+  return m[1] ? open + m[1] + close + m[2] : add;
+}
+const mergeRuns = t => t.replace(/\+\+ \+\+/g, ' ').replace(/\*\*\* \*\*\*/g, ' ').replace(/\*\* \*\*/g, ' ').replace(/([^*])\* \*(?!\*)/g, '$1 ');
+const activeInline = () => (S.inline.b || S.inline.i || S.inline.u) ? S.inline : null;
+function joinText(prev, add, wrap) {
+  if (!add) return prev;
+  const punctOnly = /^[.,;:?!…”]/.test(add);
+  if (sentenceStart(prev)) add = capFirst(add);
+  else if (!punctOnly) {
+    const w = (add.match(/^[“"(]*([A-Za-z'’]+)/) || [])[1] || '';
+    if (/^[A-Z][a-z'’]*$/.test(w) && !keepCap(prev, w)) add = add.replace(w, w[0].toLowerCase() + w.slice(1));
+  }
+  if (wrap && !punctOnly) add = wrapInline(add, wrap);
+  if (!prev.trim()) return add;
+  if (punctOnly) return prev.replace(/[ \t]+$/, '') + add;
+  return /\n$/.test(prev) || /[ \t]$/.test(prev) && MARK_END.test(prev) ? prev.replace(/[ \t]*$/, m => /\n$/.test(prev) ? '' : ' ') + add
+       : prev.replace(/[ \t]+$/, '') + ' ' + add;
+}
+// New paragraph / new line. Inside a list it starts the next item; on an empty item it ends the list.
+function lineBreak(text, kind) {
+  const t = text.replace(/[ \t]+$/, '');
+  if (!t.trim()) return text;
+  const line = t.slice(t.lastIndexOf('\n') + 1);
+  let m;
+  if (/^(?:[-*]|\d+[.)])$/.test(line)) return t.slice(0, t.length - line.length).replace(/\n+$/, '') + '\n\n';
+  if ((m = line.match(/^([-*])[ \t]+\S/))) return t + '\n' + m[1] + ' ';
+  if ((m = line.match(/^(\d+)([.)])[ \t]+\S/))) return t + '\n' + (+m[1] + 1) + m[2] + ' ';
+  if (/^(?:%|#{1,4})$/.test(line)) return t;
+  return t + (kind === 'para' ? '\n\n' : '\n');
+}
+function dictate(raw) {
+  const s = formatDictation(raw);
+  if (!s.trim()) return;
+  const before = S.text, wrap = activeInline();
+  let t = before;
+  for (const piece of s.split(/([\uE000\uE001])/)) {
+    if (piece === PARA) t = lineBreak(t, 'para');
+    else if (piece === LINE) t = lineBreak(t, 'line');
+    else if (piece.trim()) t = joinText(t, piece.trim(), wrap);
+  }
+  if (wrap) t = mergeRuns(t);
+  if (t === before) return;
+  setText(t, 'Dictation');
+  S.lastChunk = {before, after: t};
+  schedulePolish();
+}
+
+/* ================= automatic punctuation (Claude) ================= */
+let polishTimer = null, polishing = false;
+const letters = t => plain(t).toLowerCase().replace(/[^a-z0-9]/g, '');
+const markup = t => String(t).replace(/[^*+#%\n]/g, '');
+function schedulePolish() {
+  if (!S.settings.autoPunct || !S.settings.apiKey) return;
+  clearTimeout(polishTimer);
+  polishTimer = setTimeout(polishTail, 3500);
+}
+function tailStart(t) {
+  const i = t.lastIndexOf('\n\n'), j = i > 0 ? t.lastIndexOf('\n\n', i - 1) : -1;
+  let st = j >= 0 ? j + 2 : 0;
+  if (t.length - st > 1500) { const k = t.indexOf('. ', t.length - 1200); st = k > 0 ? k + 2 : t.length - 1200; }
+  return st;
+}
+const POLISH_SYS = `You fix punctuation, capitalization and spacing in text a writer dictated by voice.
+Never add, remove, replace or reorder words. You may change capital letters, add or change punctuation, and split run-on sentences.
+Capitalize names and the first word of each sentence. Lowercase words that were capitalized by mistake in the middle of a sentence.
+The text uses formatting marks: a line starting with "% " is a title, "# " to "#### " are headings, "- " is a bullet, "1. " is a numbered item, **bold**, *italic*, ++underline++. Keep every mark and every line break exactly where it is.
+The final sentence may be unfinished because she is still talking, so add no punctuation at the very end.
+Reply with only the corrected text inside <text></text>.`;
+async function polishTail() {
+  if (polishing || S.busy || !navigator.onLine) { if (S.settings.autoPunct) schedulePolish(); return; }
+  const text = S.text, st = tailStart(text), seg = text.slice(st);
+  if (words(seg) < 3 || seg === S.lastPolished) return;
+  polishing = true;
+  try {
+    const out = await callClaude(POLISH_SYS, `<text>${seg}</text>`, 2000, {model: 'claude-haiku-5-5', signal: null});
+    let fixed = tag(out, 'text');
+    if (fixed === null) return;
+    fixed = seg.match(/^\s*/)[0] + fixed.trim() + seg.match(/\s*$/)[0];
+    if (!/[.?!…]["”’)]?\s*$/.test(seg)) fixed = fixed.replace(/[.?!…]+(["”’)]?\s*)$/, '$1');
+    if (letters(fixed) !== letters(seg) || markup(fixed) !== markup(seg)) return;
+    if (fixed === seg || !S.text.startsWith(text)) return;
+    const next = text.slice(0, st) + fixed + S.text.slice(text.length);
+    const chunk = S.lastChunk && S.lastChunk.after === S.text ? S.lastChunk : null;
+    setText(next, 'Punctuation', {undoable: false});
+    S.lastChunk = chunk && next.startsWith(chunk.before) ? {before: chunk.before, after: next} : null;
+    S.lastPolished = fixed;
+  } catch (e) { /* punctuation is a nicety; never interrupt the writer */ }
+  finally { polishing = false; }
+}
+
+/* ================= formatting ================= */
+const STYLE_NAMES = {title: 'Title', heading: 'Heading', normal: 'Normal text', bullet: 'Bulleted list', number: 'Numbered list'};
+function takeUnsaved(extra) {
+  const parts = S.unsaved.slice();
+  if (extra && extra.trim()) parts.push(extra.trim());
+  S.unsaved = [];
+  return parts.join(' ');
+}
+const numberAfter = line => { const m = String(line).match(/^(\d+)[.)]/); return (m ? +m[1] + 1 : 1) + '. '; };
+function setBlock(kind, level, extra) {
+  const said = takeUnsaved(extra);
+  const t = S.text.replace(/[ \t]+$/, '');
+  const i = t.lastIndexOf('\n') + 1, line = t.slice(i);
+  const prevLine = (() => { const p = t.slice(0, Math.max(0, i - 1)); return p.slice(p.lastIndexOf('\n') + 1); })();
+  const content = line.replace(/^(?:%|#{1,4}|[-*]|\d+[.)])(?:[ \t]+|$)/, '');
+  const inList = /^(?:[-*]|\d+[.)])[ \t]/.test(line) && content.trim();
+  const single = kind === 'title' || kind === 'heading';
+  const markerFor = ref => kind === 'title' ? '% ' : kind === 'heading' ? '#'.repeat(level) + ' ' : kind === 'bullet' ? '- ' : kind === 'number' ? numberAfter(ref) : '';
+  let next;
+  if (said) {
+    const body = capFirst(formatDictation(said).replace(/[\uE000\uE001]/g, ' ').replace(/\s+/g, ' ').trim());
+    const listCont = inList && (kind === 'bullet' || kind === 'number');
+    const base = content.trim() ? t + (listCont ? '\n' : '\n\n') : t.slice(0, i);
+    next = base + markerFor(content.trim() ? line : prevLine) + body + (single ? '\n\n' : '');
+  } else if (content.trim()) {
+    next = t.slice(0, i) + markerFor(prevLine) + content + (single ? '\n\n' : '');
+  } else if (kind === 'normal') {
+    next = t.slice(0, i).replace(/\n+$/, '');
+    next = next ? next + '\n\n' : '';
+  } else {
+    next = t.slice(0, i) + markerFor(prevLine);
+  }
+  const name = kind === 'heading' ? `Heading ${level}` : STYLE_NAMES[kind];
+  setText(next, name);
+  S.lastChunk = null;
+  beep('ok');
+  showZephyr(said || content.trim() ? `${name}.` : `${name}. Your next words will use it.`);
+}
+function breakCmd(kind) {
+  const said = takeUnsaved('');
+  if (said) dictate(said);
+  const next = lineBreak(S.text, kind);
+  if (next === S.text) return beep('down');
+  setText(next, kind === 'para' ? 'New paragraph' : 'New line');
+  S.lastChunk = null;
+  beep('ok');
+}
+const INLINE = {bold: ['b', '**', 'Bold'], italic: ['i', '*', 'Italic'], italics: ['i', '*', 'Italic'], italicize: ['i', '*', 'Italic'],
+  underline: ['u', '++', 'Underline'], underlined: ['u', '++', 'Underline'], underlining: ['u', '++', 'Underline']};
+function tidyRange(s, e) {
+  const t = S.text;
+  while (s < e && /[\s“"‘(]/.test(t[s])) s++;
+  while (e > s && /[\s.,;:!?…"”’)]/.test(t[e - 1])) e--;
+  const ls = t.lastIndexOf('\n', s - 1) + 1, mm = t.slice(ls).match(/^(?:%|#{1,4}|[-*]|\d+[.)])[ \t]+/);
+  if (mm && s < ls + mm[0].length) s = ls + mm[0].length;
+  return e > s ? [s, e] : null;
+}
+function findTarget(arg) {
+  const t = S.text, a = String(arg || '').trim().replace(/[.!?]+$/, '');
+  const L = a.toLowerCase().replace(/^the\s+/, '');
+  let m;
+  if (!L || /^(?:that|it|this|what i (?:just )?said|last bit)$/.test(L)) {
+    if (S.lastChunk && S.lastChunk.after === t) return tidyRange(S.lastChunk.before.length, t.length);
+    const body = t.replace(/\s+$/, ''); return tidyRange(removeLastSentence(body).length, body.length);
+  }
+  if (/^(?:last |this )?sentence$/.test(L)) { const body = t.replace(/\s+$/, ''); return tidyRange(removeLastSentence(body).length, body.length); }
+  if ((m = L.match(/^last (?:(\w+) )?words?$/))) {
+    const ms = [...t.matchAll(/\S+/g)]; if (!ms.length) return null;
+    const n = m[1] ? num(m[1]) || 1 : 1, a0 = ms[Math.max(0, ms.length - n)], z = ms[ms.length - 1];
+    return tidyRange(a0.index, z.index + z[0].length);
+  }
+  if (/^(?:last |this |current )?(?:paragraph|line|item|bullet)$/.test(L)) { const body = t.replace(/\s+$/, ''); return tidyRange(body.lastIndexOf('\n') + 1, body.length); }
+  const phrase = a.replace(/^(?:the\s+)?(?:words?|phrase)\s+/i, '');
+  const ws = phrase.match(/[A-Za-z0-9'’]+/g);
+  if (!ws) return null;
+  const re = new RegExp(ws.map(w => escRe(w).replace(/['’]/g, "['’]")).join('[^A-Za-z0-9]+'), 'gi');
+  let last = null;
+  for (const x of t.matchAll(re)) last = x;
+  return last ? tidyRange(last.index, last.index + last[0].length) : null;
+}
+function inlineCmd(word, arg, off) {
+  const [k, mk, name] = INLINE[word.toLowerCase()];
+  const a = String(arg || '').trim().replace(/[.!?]+$/, '');
+  if (off || /^(?:off|stop|end|done|finished)$/i.test(a)) { S.inline[k] = false; renderStatus(); beep('down'); showZephyr(`${name} off.`); return; }
+  if (!a || /^(?:on|start)$/i.test(a)) { S.inline[k] = true; renderStatus(); say(`${name} on. Say Zephyr ${name.toLowerCase()} off when you're done.`); return; }
+  const r = findTarget(a);
+  if (!r) return say(`I couldn't find ${a} in the manuscript.`);
+  const t = S.text, [s0, e0] = r;
+  setText(t.slice(0, s0) + mk + t.slice(s0, e0) + mk + t.slice(e0), name);
+  S.lastChunk = null; beep('ok');
+  showZephyr(`${name}: “${short(plain(t.slice(s0, e0)))}”`);
+}
+const countMk = (str, mk) => (mk === '*' ? str.replace(/\*\*/g, '') : str).split(mk).length - 1;
+const stripMk = (str, mk) => mk === '*' ? str.replace(/\*\*/g, '').replace(/\*/g, '').replace(//g, '**') : str.split(mk).join('');
+function unformat(word, arg) {
+  const w = word.toLowerCase(), marks = w === 'formatting' ? ['**', '++', '*'] : [INLINE[w][1]];
+  const r = findTarget(arg);
+  if (!r) return say(`I couldn't find ${arg || 'that'} in the manuscript.`);
+  const t = S.text, [s0, e0] = r;
+  let before = t.slice(0, s0), mid = t.slice(s0, e0), after = t.slice(e0);
+  const endsMk = (str, mk) => mk === '*' ? /(^|[^*])\*$/.test(str) : str.endsWith(mk);
+  const startsMk = (str, mk) => mk === '*' ? /^\*(?!\*)/.test(str) : str.startsWith(mk);
+  for (const mk of marks) {
+    const inStart = countMk(before, mk) % 2 === 1, inEnd = countMk(before + mid, mk) % 2 === 1;
+    mid = stripMk(mid, mk);
+    if (inStart) { if (endsMk(before, mk)) before = before.slice(0, -mk.length); else mid = mk + mid; }
+    if (inEnd) { if (startsMk(after, mk)) after = after.slice(mk.length); else mid = mid + mk; }
+  }
+  const next = before + mid + after;
+  if (next === t) return say('That text has no formatting to remove.');
+  setText(next, 'Remove formatting');
+  S.lastChunk = null; beep('down');
+}
+
+/* ================= speech output ================= */
+let speakGen = 0, voices = [];
+function loadVoices() {
+  if (!('speechSynthesis' in window)) return;
+  voices = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+  const sel = $('#voice'), cur = S.settings.voice;
+  sel.innerHTML = '<option value="">Phone default</option>' + voices.map(v => `<option value="${esc(v.voiceURI)}">${esc(v.name)} (${esc(v.lang)})</option>`).join('');
+  sel.value = cur;
+}
+const pickVoice = () => voices.find(v => v.voiceURI === S.settings.voice) || null;
+function speechChunks(text) {
+  const out = [];
+  for (const p of String(text).split(/\n+/)) {
+    const sents = p.match(/[^.!?…]+[.!?…]+["”’)\]]*\s*|[^.!?…]+$/g) || [];
+    let buf = '';
+    for (const s of sents) { if (buf && (buf + s).length > 220) { out.push(buf.trim()); buf = ''; } buf += s; }
+    if (buf.trim()) out.push(buf.trim());
+  }
+  return out;
+}
+function speak(text, {remember = true} = {}) {
+  return new Promise(resolve => {
+    const gen = ++speakGen;
+    if (!('speechSynthesis' in window)) return resolve();
+    speechSynthesis.cancel();
+    if (remember) S.lastSpoken = text;
+    S.echo = text;
+    const chunks = speechChunks(text);
+    if (!chunks.length) return resolve();
+    S.speaking = true; pauseRecIfNeeded(); renderStatus();
+    let i = 0;
+    const next = () => {
+      if (gen !== speakGen) return resolve();
+      if (i >= chunks.length) { S.speaking = false; S.speechEnd = Date.now(); renderStatus(); resumeRec(); return resolve(); }
+      const u = new SpeechSynthesisUtterance(chunks[i++]);
+      u.rate = +S.settings.rate || 1;
+      const v = pickVoice(); if (v) u.voice = v;
+      u.lang = v ? v.lang : S.settings.lang;
+      u.onend = next; u.onerror = next;
+      speechSynthesis.speak(u);
+    };
+    setTimeout(next, 60);
+  });
+}
+function stopSpeaking() {
+  speakGen++;
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  if (S.speaking) { S.speaking = false; S.speechEnd = Date.now(); renderStatus(); resumeRec(); }
+}
+function say(text) { showZephyr(text); return speak(text); }
+function readAloud(text) { S.lastRead = text; showZephyr('Reading aloud…'); return speak(plain(text)); }
+
+let actx = null;
+function beep(kind) {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    const tones = kind === 'wake' ? [660, 990] : kind === 'down' ? [700, 440] : [880];
+    tones.forEach((f, i) => {
+      const o = actx.createOscillator(), g = actx.createGain(), t = actx.currentTime + i * 0.13;
+      o.frequency.value = f; o.type = 'sine';
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.13);
+    });
+  } catch (e) {}
+}
+
+/* ================= speech input ================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, recRunning = false, recPaused = false, wantListen = false, wakeLock = null, greeted = false;
+const committed = {};
+let stallTimer = null;
+const wordsOf = t => String(t).trim().split(/\s+/).filter(Boolean);
+const bare = w => w.toLowerCase().replace(/[^a-z0-9']/g, '');
+function commitPart(i, txt) {
+  const prev = committed[i] || '';
+  committed[i] = txt;
+  if (!prev) return handleFinal(txt);
+  const pw = wordsOf(prev), tw = wordsOf(txt);
+  if (tw.length <= pw.length) return;
+  for (let k = 0; k < pw.length; k++) if (bare(pw[k]) !== bare(tw[k])) return;
+  handleFinal(tw.slice(pw.length).join(' '));
+}
+function makeRec() {
+  const r = new SR();
+  r.continuous = true; r.interimResults = true; r.lang = S.settings.lang || 'en-US'; r.maxAlternatives = 1;
+  r.onstart = () => { recRunning = true; for (const k in committed) delete committed[k]; renderStatus(); };
+  r.onresult = e => {
+    let interim = '';
+    const pending = [];
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const res = e.results[i], txt = res[0].transcript;
+      if (res.isFinal) commitPart(i, txt); else { interim += txt; pending.push([i, txt]); }
+    }
+    if (interim && !S.speaking) showHeard(interim, true);
+    clearTimeout(stallTimer);
+    if (pending.length) stallTimer = setTimeout(() => pending.forEach(([i, txt]) => commitPart(i, txt)), 1600);
+  };
+  r.onerror = e => {
+    if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+      wantListen = false; renderStatus();
+      showZephyr('Microphone access is blocked. Allow the microphone for this page in your browser settings, then tap Start listening.');
+    }
+  };
+  r.onend = () => {
+    recRunning = false; clearTimeout(stallTimer); renderStatus();
+    if (wantListen && !recPaused) setTimeout(() => { if (wantListen && !recRunning && !recPaused) startRec(); }, 300);
+  };
+  return r;
+}
+function startRec() { if (!rec) rec = makeRec(); try { rec.start(); } catch (e) {} }
+function pauseRecIfNeeded() { if (!S.settings.listenWhileTalking && wantListen && rec) { recPaused = true; try { rec.abort(); } catch (e) {} } }
+function resumeRec() { if (recPaused) { recPaused = false; if (wantListen) setTimeout(startRec, 250); } }
+async function startListening() {
+  if (!SR) { say('This browser cannot listen. On iPhone use Safari, on Android use Chrome.'); return; }
+  wantListen = true; startRec(); renderStatus(); keepAwake();
+  if (!greeted) { greeted = true; say(S.session ? `Picking up your session on ${S.doc.title}. Say Zephyr help for commands.` : 'Listening. Say Zephyr compose to write, or Zephyr help for commands.'); }
+  else beep('ok');
+}
+function stopListening() {
+  wantListen = false; recPaused = false; S.awaiting = null;
+  if (rec) { try { rec.abort(); } catch (e) {} }
+  releaseAwake(); renderStatus();
+}
+async function keepAwake() { try { if ('wakeLock' in navigator && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', () => { wakeLock = null; }); } } catch (e) {} }
+function releaseAwake() { try { wakeLock && wakeLock.release(); } catch (e) {} wakeLock = null; }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wantListen) { keepAwake(); if (!recRunning && !recPaused) startRec(); } });
+
+/* ================= routing what was heard ================= */
+// "Zephyr" is rare in everyday speech, so recognisers often spell it oddly. These spellings always count.
+const WAKE_EXACT = new RegExp(String.raw`\b(?:hey\s+|okay\s+|ok\s+)?(?:zephyr(?:'s|s)?|zephyre|zephir|zephere|zepher|zephur|zefir|zeffir|zefer|zeffer|zefur|zafir|zafer|zaffer|zephy|zeph\s?(?:yr|ear|er|ir|fur)|z(?:ee|ed)?[\s-]?(?:fur|fir|fear|fer)|zeph)\b[\s,.:;!?-]*`, 'i');
+// These are real words, so they only count at the start of what you said and only when a command follows.
+const WAKE_SOFT = /^(?:sapphire|sapphires|safire|saffire|sephora|sefer|seffer|zephyrus|sapphire's)$/i;
+const CMD_START = new Set(('end finish close back backup save sync add put keep help commands formatting format style styles pause stop quiet ' +
+  'hush enough cancel scratch strike undo redo read repeat word how why what apply accept edit revise rewrite change fix replace cut move ' +
+  'insert delete remove feedback critique review suggest suggestions explain teach create make start rename call name list open switch ' +
+  'go compose composing draft dictate write resume continue new next title heading header normal plain bulleted bullet bullets ' +
+  'numbered number numbering bold italic italics italicize underline turn no clear').split(' '));
+const skeleton = w => w.toLowerCase().replace(/ph/g, 'f').replace(/v/g, 'f').replace(/[aeiouyh'’]/g, '').replace(/(.)\1+/g, '$1');
+function wakeMatch(t) {
+  const m = String(t).match(WAKE_EXACT);
+  if (m) return m;
+  // any word starting with z or x that sounds like z-f-r
+  for (const x of String(t).matchAll(/[A-Za-z'’]+/g)) {
+    const w = x[0];
+    if (/^[zx]/i.test(w) && w.length >= 4 && w.length <= 9 && /^[zx]fr$/.test(skeleton(w))) {
+      const tail = String(t).slice(x.index + w.length).match(/^[\s,.:;!?-]*/)[0];
+      const r = [w + tail]; r.index = x.index; return r;
+    }
+  }
+  const lead = String(t).match(/^\s*(?:hey\s+|okay\s+|ok\s+)?([A-Za-z'’]+)([\s,.:;!?-]+)([A-Za-z]+)/);
+  if (lead && WAKE_SOFT.test(lead[1]) && CMD_START.has(lead[3].toLowerCase())) {
+    const r = [lead[0].slice(0, lead[0].length - lead[3].length)]; r.index = lead.index; return r;
+  }
+  return null;
+}
+const STOPRE = /^(?:stop|quiet|hush|shush|enough|cancel|be quiet|stop talking|shut up|pause)\b/i;
+let awaitTimer = null;
+function setAwait(kind, ms) { S.awaiting = kind; clearTimeout(awaitTimer); awaitTimer = setTimeout(() => { S.awaiting = null; renderStatus(); }, ms || 10000); renderStatus(); }
+function clearAwait() { S.awaiting = null; clearTimeout(awaitTimer); renderStatus(); }
+function afterWake(t) { const m = wakeMatch(t); return m ? t.slice(m.index + m[0].length).replace(/^[\s,.:;!?-]+/, '') : ''; }
+function isEcho(t) {
+  if (!S.echo || Date.now() - S.speechEnd > 2500) return false;
+  const n = norm(t);
+  return n.length > 3 && norm(S.echo).includes(n);
+}
+function handleFinal(raw, typed) {
+  const t = String(raw).trim();
+  if (!t) return;
+  const now = Date.now();
+  if (!typed) {
+    if (t === S.lastFinal && now - S.lastFinalAt < 2000) return;
+    S.lastFinal = t; S.lastFinalAt = now;
+    if (S.speaking) { if (!!wakeMatch(t) && STOPRE.test(afterWake(t))) { stopSpeaking(); showHeard(t); } return; }
+    if (isEcho(t)) return;
+  } else if (S.speaking) stopSpeaking();
+  if (S.busy) {
+    if (!!wakeMatch(t) && STOPRE.test(afterWake(t))) { S.abort && S.abort.abort(); showHeard(t); }
+    else showHeard(t + ' (still working, ignored)', true);
+    return;
+  }
+  const m = wakeMatch(t);
+  if (S.awaiting && !m) {
+    const k = S.awaiting; clearAwait(); showHeard(t);
+    if (k === 'edit') return runEdit(t);
+    if (k === 'explain') return runExplain(t);
+    if (k === 'title') return rename(t);
+    return runCommand(t);
+  }
+  if (!m) {
+    if (S.mode === 'draft') { showHeard(t); dictate(t); }
+    else { S.unsaved.push(t); showHeard(S.unsaved.join(' '), true); showZephyr('Not in the manuscript yet. Say “Zephyr add to manuscript” to keep it.'); }
+    return;
+  }
+  const before = t.slice(0, m.index), after = afterWake(t);
+  if (before.trim()) { if (S.mode === 'draft') dictate(before); else S.unsaved.push(before.trim()); }
+  clearAwait();
+  if (!after.trim()) { showHeard('Zephyr…'); setAwait('command', 9000); beep('wake'); return; }
+  runCommand(after);
+}
+
+const HELP = 'Say Zephyr, then a command. Compose, to start writing everything you say into the manuscript. Pause, to stop. Add to manuscript, to keep what you just said. Back up, to save to Google Drive. Scratch that. Read, or read last paragraph. Edit, then what to change. Feedback. Apply suggestion, and a number. Explain, then your question. Undo, or redo. Create new. Rename, then a name. Open, then a document name. Formatting help, for titles, headings, lists, bold, italic and underline. Word count. Repeat. Stop, to silence me. And end session, to save your draft.';
+
+const FORMAT_HELP = 'Formatting commands. Say Zephyr, then: Title. Heading one, two, three or four. Normal text. Bulleted list. Numbered list. End list. New paragraph. New line. Bold, italic or underline, followed by that, last sentence, last word, or the words you want. Say bold on, then bold off, to format as you talk. Remove bold, or remove formatting, to undo it. You can add words right after a style, like: Zephyr heading two, chapter one.';
+const KEEP = true;
+const COMMANDS = [
+  [/^(?:end|finish|close|save and end)\s+(?:the\s+|my\s+|this\s+)?session\b/i, () => endSession()],
+  [/^(?:back ?up|backup|save to drive|sync)\b/i, () => backupNow()],
+  [/^(?:add|put|keep|save)\s+(?:that|it|this|what i (?:just )?said)?\s*(?:to|in|into|on)?\s*(?:the\s+)?(?:manuscript|document|draft)\b[\s,:]*(.*)$/i, m => addToManuscript(m[1])],
+  [/^(?:add|keep|save) (?:that|it|this)$/i, () => addToManuscript('')],
+  [/^(?:help|commands|list commands|what can (?:i|you) (?:say|do))$/i, () => say(HELP)],
+  [/^(?:formatting|format|style|styles)(?: help| commands)?$/i, () => say(FORMAT_HELP)],
+  [/^(?:new|next) (?:paragraph|para)$/i, () => breakCmd('para'), KEEP],
+  [/^(?:new|next) (?:line|item|bullet|point)$/i, () => breakCmd('line'), KEEP],
+  [/^(?:remove|take off|clear|undo|no more)\s+(?:the\s+)?(bold|italics?|underline|underlining|formatting)\b\s*(?:from|on|in)?\s*(.*)$/i, m => unformat(m[1], m[2]), KEEP],
+  [/^(?:end|stop|turn off|no)\s+(bold|italics?|underline|underlining)$/i, m => inlineCmd(m[1], '', true), KEEP],
+  [/^make (.+?) (bold|italics?|italic|underlined)$/i, m => inlineCmd(m[2], /^(?:it|that|this)$/i.test(m[1]) ? 'that' : m[1], false), KEEP],
+  [/^(?:make (?:it |this |that )?(?:a |the )?)?title\b[\s,:]*(.*)$/i, m => setBlock('title', 0, m[1]), KEEP],
+  [/^(?:make (?:it |this |that )?(?:a )?)?(?:heading|header|headline|subheading)(?:\s+(?:level\s+)?(one|two|three|four|won|to|too|for|1|2|3|4)\b)?[\s,:]*(.*)$/i, m => setBlock('heading', Math.min(4, num(m[1]) || 1), m[2]), KEEP],
+  [/^(?:make (?:it |this |that )?)?(?:normal|plain|body|regular)(?: text| paragraph)?\b[\s,:]*(.*)$/i, m => setBlock('normal', 0, m[1]), KEEP],
+  [/^(?:end|stop|exit|finish) (?:the )?(?:list|bullets|numbering)$/i, () => setBlock('normal', 0, ''), KEEP],
+  [/^(?:make (?:it |this |that )?(?:a )?)?(?:numbered|number|numbering)(?: list)?\b[\s,:]*(.*)$/i, m => setBlock('number', 0, m[1]), KEEP],
+  [/^(?:make (?:it |this |that )?(?:a )?)?(?:bulleted|bullet|bullets)(?: points?| list)?\b[\s,:]*(.*)$/i, m => setBlock('bullet', 0, m[1]), KEEP],
+  [/^(?:turn on |start )?(bold|italics?|italicize|underline|underlined)\b[\s,:]*(.*)$/i, m => inlineCmd(m[1], m[2], false), KEEP],
+  [/^(?:pause|stop composing|done composing|stop drafting|done drafting|stop writing|stop dictating|stop dictation)\b/i, () => { S.mode = 'idle'; renderStatus(); say('Paused. Say Zephyr compose to continue.'); }],
+  [STOPRE, () => { stopSpeaking(); if (S.mode === 'draft') { S.mode = 'idle'; renderStatus(); say('Composing paused.'); } else beep('down'); }],
+  [/^(?:scratch that|delete that|strike that|scratch it)\b/i, () => scratch()],
+  [/^undo\s+(?:all|everything|every change)\b/i, () => undoAll()],
+  [/^undo\b/i, () => undo()],
+  [/^redo\b/i, () => redo()],
+  [/^(?:read|read back|read me|read it)\b\s*(.*)$/i, m => readCmd(m[1])],
+  [/^(?:repeat|say that again|what did you say|again)\b/i, () => speak(S.lastSpoken || "I haven't said anything yet.")],
+  [/^(?:word count|how long is it|how many words)\b/i, () => say(`${words(S.text)} words.`)],
+  [/^(?:apply|accept)\b\s*(?:the\s+)?(?:suggestions?|number)?\s*(.*)$/i, m => applyCmd(m[1])],
+  [/^(?:edit|revise|rewrite|change|fix|replace|cut|move|add|insert|delete|remove)\b/i, (m, c) => runEdit(c.replace(/^(?:edit|revise)\b[\s,:]*/i, ''))],
+  [/^(?:feedback|critique|give me (?:some )?feedback|suggest(?:ions| edits| changes)?|review(?: it| this| the draft)?)\b\s*(?:on|about|for)?\s*(.*)$/i, m => runFeedback(m[1])],
+  [/^(?:explain|teach me|help me understand)\b[\s,:]*(.*)$/i, m => runExplain(m[1])],
+  [/^(?:create|make|start)\s+(?:a\s+)?new\b\s*(.*)$/i, m => createNew(/blank|empty|scratch|fresh/i.test(m[1]))],
+  [/^(?:rename|re-name|call (?:it|this|the document)|name (?:it|this|the document))\b\s*(?:this|it|the document|the doc|this document)?\s*(?:to|as)?\s*(.*)$/i, m => { if (m[1].trim()) return rename(m[1]); setAwait('title', 15000); return say('What should I call it?'); }],
+  [/^(?:list|what are)\s+(?:my\s+|the\s+)?(?:documents|docs|drafts|files)\b/i, () => listDocs()],
+  [/^(?:open|switch to|go to|load)\s+(.+)$/i, m => openByName(m[1])],
+  [/^(?:how|why|what|when|where|should|is|are|can|could|does|do|would|which)\b/i, (m, c) => runExplain(c)],
+  [/^(?:compose|composing|start composing|draft|drafting|dictate|dictation|write|start writing|start drafting|resume|continue|keep going)\b[\s,:]*(.*)$/i, m => {
+    S.mode = 'draft'; renderStatus();
+    const said = takeUnsaved('');
+    if (said) dictate(said);
+    if (m[1].trim()) { beep('ok'); dictate(m[1]); } else say('Composing. Everything you say goes into the manuscript. Say Zephyr pause to stop.');
+  }, KEEP]
+];
+function addToManuscript(extra) {
+  const parts = S.unsaved.slice();
+  if (extra && extra.trim()) parts.push(extra.trim());
+  S.unsaved = [];
+  if (!parts.length) return say('There is nothing new to add. Say it again, then say Zephyr add to manuscript.');
+  dictate(parts.join(' '));
+  beep('ok');
+  showZephyr(`Added ${words(parts.join(' '))} words to the manuscript.`);
+}
+function runCommand(raw) {
+  const c = String(raw).trim().replace(/^[\s,.:;!?-]+/, '').replace(/[.!?]+$/, '').trim();
+  showHeard('Zephyr, ' + c);
+  for (const [re, fn, keep] of COMMANDS) {
+    const m = c.match(re);
+    if (m) { if (!keep && !/^(?:add|put|keep|save)\b/i.test(c)) S.unsaved = []; return fn(m, c); }
+  }
+  say(`I heard, ${c}. That isn't a command I know. Say Zephyr help.`);
+}
+
+/* ================= reading ================= */
+function readCmd(arg) {
+  const a = norm(arg);
+  if (!S.text.trim()) return say('The document is empty. Say Zephyr compose and start talking.');
+  const paras = paragraphs(S.text);
+  let m;
+  if (/\btitle\b/.test(a)) return say(`The title is ${S.doc.title}.`);
+  if (/last sentence/.test(a)) { const s = sentences(S.text); return readAloud(s[s.length - 1]); }
+  if ((m = a.match(/last (\w+) (?:paragraphs|paras)/))) { const n = num(m[1]) || 2; return readAloud(paras.slice(-n).join('\n')); }
+  if ((m = a.match(/last (\w+) sentences/))) { const n = num(m[1]) || 2; return readAloud(sentences(S.text).slice(-n).join(' ')); }
+  if (/^last( paragraph| para| bit| part)?$/.test(a) || /last paragraph/.test(a)) return readAloud(paras[paras.length - 1]);
+  if (/(?:first paragraph|opening|first para)/.test(a)) return readAloud(paras[0]);
+  if ((m = a.match(/paragraph (\w+)/))) {
+    const n = num(m[1]);
+    if (!n || !paras[n - 1]) return say(`There ${paras.length === 1 ? 'is one paragraph' : 'are ' + paras.length + ' paragraphs'}.`);
+    return readAloud(paras[n - 1]);
+  }
+  return readAloud(S.text);
+}
+
+/* ================= Claude ================= */
+async function callClaude(system, user, maxTokens, opts = {}) {
+  let r;
+  const signal = 'signal' in opts ? (opts.signal || undefined) : (S.abort ? S.abort.signal : undefined);
+  try {
+    r = await fetch(API, {
+      method: 'POST', signal,
+      headers: {'content-type': 'application/json', 'x-api-key': S.settings.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true'},
+      body: JSON.stringify({model: opts.model || S.settings.model, max_tokens: maxTokens, system, messages: [{role: 'user', content: user}]})
+    });
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    throw new Error("I couldn't reach Claude. You may be out of signal. Try again in a minute.");
+  }
+  let j = {};
+  try { j = await r.json(); } catch (e) {}
+  if (!r.ok) {
+    if (r.status === 401) throw new Error('Your API key was rejected. Check it in Settings when you are parked.');
+    if (r.status === 429 || r.status === 529) throw new Error('Claude is busy right now. Try again in a moment.');
+    throw new Error('Claude returned an error: ' + ((j.error && j.error.message) || r.status));
+  }
+  if (j.stop_reason === 'max_tokens') throw new Error('That response ran too long for me to finish. Try a smaller request.');
+  return (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+}
+function guardAI() {
+  if (S.busy) { say("I'm still working on the last request."); return false; }
+  if (!S.settings.apiKey) { say('I need your Claude API key first. Add it in Settings when you are parked.'); return false; }
+  return true;
+}
+async function withBusy(label, fn) {
+  S.busy = true; S.abort = new AbortController(); showZephyr(label); renderStatus(); beep('ok');
+  try { await fn(); }
+  catch (e) { S.busy = false; renderStatus(); await say(e.name === 'AbortError' ? 'Cancelled.' : e.message); }
+  finally { S.busy = false; S.abort = null; renderStatus(); }
+}
+const MARKUP_NOTE = 'The document uses formatting marks: a line starting with "% " is the title, "# " to "#### " are headings one to four, "- " is a bullet, "1. " is a numbered item, **bold**, *italic*, ++underline++. Keep these marks unless the instruction is about formatting; use them when it is. Never read the marks aloud or mention them by name.';
+const VOICE_RULES = 'Everything you say is read aloud by text-to-speech to a writer who is driving. Use plain spoken sentences. No markdown, no bullet symbols, no emoji, no headings.';
+const COMMAND_LIST = 'Zephyr commands she can say: Zephyr compose (everything she says then goes into the manuscript), Zephyr pause, Zephyr scratch that, Zephyr read (or read last paragraph, read paragraph three), Zephyr edit followed by the change, Zephyr feedback, Zephyr apply suggestion and a number, Zephyr explain followed by a question, Zephyr undo, Zephyr redo, Zephyr create new, Zephyr rename, Zephyr open, Zephyr end session. Formatting: Zephyr title, Zephyr heading one to four, Zephyr normal text, Zephyr bulleted list, Zephyr numbered list, Zephyr new paragraph, Zephyr bold or italic or underline followed by that, last sentence or the words, Zephyr remove formatting.';
+function editSystem(forceFull) {
+  return `You are the editing engine inside Zephyr, a voice writing assistant. Apply the writer's spoken edit instruction to her document.
+Change only what the instruction requires and keep every other character exactly as it is. Preserve her voice and style. The instruction was transcribed from speech, so read past obvious mishearings. Phrases like "that sentence" or "what I just said" usually point to the most recent dictation or the passage most recently read aloud, both provided.
+Respond in exactly this format:
+<summary>One or two plain spoken sentences saying what you changed. If the change is short, quote the new wording.</summary>
+${forceFull ? '<full_document>the complete revised document</full_document>' : `Then EITHER one or more blocks of
+<change><find>text copied character for character from the document, long enough to be unique</find><replace>the new text</replace></change>
+OR, only when the change rewrites most of the document or the document is empty, a single
+<full_document>the complete revised document</full_document>`}
+If the instruction is unclear or cannot be applied, reply with only a <summary> that asks a short clarifying question, and make no changes.
+${MARKUP_NOTE}
+${VOICE_RULES}`;
+}
+function editUser(instruction) {
+  return `<document>\n${S.text || '(empty)'}\n</document>\n<recent_dictation>${S.lastChunk ? S.lastChunk.after.slice(S.lastChunk.before.length).trim() : '(none)'}</recent_dictation>\n<last_read_aloud>${S.lastRead ? S.lastRead.slice(0, 2000) : '(none)'}</last_read_aloud>\n<instruction>${instruction}</instruction>`;
+}
+function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+function applyChanges(text, changes) {
+  let out = text;
+  for (const c of changes) {
+    if (!c.find) return null;
+    const i = out.indexOf(c.find);
+    if (i >= 0) { out = out.slice(0, i) + c.replace + out.slice(i + c.find.length); continue; }
+    const pat = escRe(c.find.trim()).replace(/\s+/g, '\\s+').replace(/["“”]/g, '["“”]').replace(/['‘’]/g, "['‘’]");
+    const m = out.match(new RegExp(pat));
+    if (!m) return null;
+    out = out.slice(0, m.index) + c.replace + out.slice(m.index + m[0].length);
+  }
+  return out;
+}
+async function runEdit(instruction) {
+  instruction = String(instruction || '').trim();
+  if (!instruction) { setAwait('edit', 20000); return say('What should I change?'); }
+  if (!guardAI()) return;
+  await withBusy('Editing…', async () => {
+    let out = await callClaude(editSystem(false), editUser(instruction), 16000);
+    let summary = tag(out, 'summary') || 'Done.';
+    let full = tag(out, 'full_document');
+    const changes = [...out.matchAll(/<change>\s*<find>([\s\S]*?)<\/find>\s*<replace>([\s\S]*?)<\/replace>\s*<\/change>/g)]
+      .map(x => ({find: trimNL(x[1]), replace: trimNL(x[2])}));
+    let next = null;
+    if (full !== null) next = full;
+    else if (changes.length) {
+      next = applyChanges(S.text, changes);
+      if (next === null) {
+        out = await callClaude(editSystem(true), editUser(instruction), 16000);
+        full = tag(out, 'full_document');
+        if (full === null) throw new Error("I couldn't match that edit to your text. Try saying it a different way.");
+        next = full; summary = tag(out, 'summary') || summary;
+      }
+    }
+    if (next !== null && next !== S.text) setText(next, 'Edit: ' + short(instruction));
+    S.busy = false; renderStatus();
+    await say(clean(summary));
+  });
+}
+const FEEDBACK_SYS = `You are Zephyr, a sharp and warm editor giving feedback a writer can absorb by ear while she drives.
+Respond in exactly this format:
+<spoken>Two to four sentences: what is working, and the most important thing to improve.</spoken>
+Then up to four blocks, most important first:
+<suggestion><say>Under 45 words. Say where in the piece by quoting a few of its words, what to change, and why.</say><instruction>A precise edit instruction an editor could apply to the document without seeing this conversation.</instruction></suggestion>
+${MARKUP_NOTE}
+${VOICE_RULES}`;
+async function runFeedback(focus) {
+  if (!S.text.trim()) return say('There is nothing to give feedback on yet. Say Zephyr compose and start talking.');
+  if (!guardAI()) return;
+  await withBusy('Reading your draft…', async () => {
+    const out = await callClaude(FEEDBACK_SYS, `<document>\n${S.text}\n</document>` + (focus && focus.trim() ? `\n<focus>${focus.trim()}</focus>` : ''), 3000);
+    const spoken = tag(out, 'spoken') || '';
+    S.suggestions = [...out.matchAll(/<suggestion>([\s\S]*?)<\/suggestion>/g)]
+      .map(x => ({say: tag(x[1], 'say'), instruction: tag(x[1], 'instruction')}))
+      .filter(s => s.say && s.instruction);
+    renderSuggestions();
+    let speech = clean(spoken);
+    S.suggestions.forEach((s, i) => { speech += ` Suggestion ${i + 1}. ${clean(s.say)}`; });
+    if (S.suggestions.length) speech += ' To use one, say Zephyr apply suggestion, and its number. Or say Zephyr apply all.';
+    S.busy = false; renderStatus();
+    await say(speech || clean(out));
+  });
+}
+function applyCmd(arg) {
+  if (!S.suggestions.length) return say('There are no suggestions yet. Say Zephyr feedback first.');
+  const a = String(arg || '').toLowerCase();
+  let picks;
+  if (/\b(all|everything|every|them)\b/.test(a)) picks = S.suggestions.map((_, i) => i + 1);
+  else picks = a.split(/[\s,]+|\band\b/).map(num).filter(n => n && S.suggestions[n - 1]);
+  picks = [...new Set(picks)];
+  if (!picks.length) { return say(`I have suggestions one through ${S.suggestions.length}. Say Zephyr apply suggestion, and a number.`); }
+  const instr = picks.length === 1 ? S.suggestions[picks[0] - 1].instruction
+    : 'Make all of these changes:\n' + picks.map(n => `${n}. ${S.suggestions[n - 1].instruction}`).join('\n');
+  return runEdit(instr);
+}
+const EXPLAIN_SYS = `You are Zephyr, a writing teacher talking with a writer while she drives. Answer her question about writing, revising or editing in under 150 words of plain spoken prose. Be concrete. When her document is relevant, refer to it by quoting a few of its words. When it helps, tell her exactly what to say to make the change, for example: say Zephyr edit, then cut the first sentence of the opening.
+${COMMAND_LIST}
+${MARKUP_NOTE}
+${VOICE_RULES}`;
+async function runExplain(q) {
+  q = String(q || '').trim();
+  if (!q) { setAwait('explain', 20000); return say('What would you like to know?'); }
+  if (!guardAI()) return;
+  await withBusy('Thinking…', async () => {
+    const out = await callClaude(EXPLAIN_SYS, `<document>\n${S.text || '(empty)'}\n</document>\n<last_read_aloud>${S.lastRead ? S.lastRead.slice(0, 2000) : '(none)'}</last_read_aloud>\n<question>${q}</question>`, 1200);
+    S.busy = false; renderStatus();
+    await say(clean(out));
+  });
+}
+
+/* ================= documents by voice ================= */
+async function listDocs() {
+  const docs = (await DB.all('docs')).sort((a, b) => b.updatedAt - a.updatedAt);
+  const names = docs.slice(0, 8).map(d => d.title);
+  say(`You have ${docs.length} document${docs.length === 1 ? '' : 's'}: ${names.join(', ')}. Say Zephyr open, and a name.`);
+}
+async function openByName(name) {
+  const q = norm(name).replace(/^(?:the|my)\s+/, '').replace(/\s+(?:document|doc|draft|essay|story)$/, '');
+  const docs = await DB.all('docs');
+  let best = null, score = 0;
+  for (const d of docs) {
+    const t = norm(d.title);
+    let s = t === q ? 100 : t.includes(q) ? 50 : 0;
+    for (const w of q.split(' ')) if (w.length > 2 && t.includes(w)) s += 5;
+    if (s > score) { score = s; best = d; }
+  }
+  if (!best) return say(`I couldn't find a document called ${name}. Say Zephyr list documents.`);
+  if (S.doc && best.id === S.doc.id) return say(`You're already in ${best.title}.`);
+  const had = !!S.session;
+  await openDoc(best);
+  say(`Opened ${best.title}. ${words(best.text)} words.${had ? ' Your previous draft was saved.' : ''}`);
+}
+
+/* ================= Google Drive backup ================= */
+const BK = {queue: {}, flushing: false, timer: null, due: 0, last: 0, error: ''};
+const backupOn = () => !!(S.settings.backupUrl && S.settings.backupSecret);
+const pad = n => String(n).padStart(2, '0');
+function stamp(t) { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}.${pad(d.getMinutes())}`; }
+const docPayload = d => ({action: 'saveDoc', docId: d.id, title: d.title, text: d.text || ''});
+const sessionPayload = ended => ({action: 'sessionBackup', sessionId: S.session.id, label: `${stamp(S.session.startedAt)} ${S.doc.title}`, text: S.text, ended});
+function scheduleFlush(delay) {
+  const due = Date.now() + delay;
+  if (BK.timer && BK.due <= due) return;
+  clearTimeout(BK.timer); BK.due = due;
+  BK.timer = setTimeout(() => { BK.timer = null; flushBackups(); }, delay);
+}
+function queueBackup(key, payload, delay) {
+  if (!backupOn()) return;
+  BK.queue[key] = payload;
+  DB.put('kv', BK.queue, 'backupQueue').catch(() => {});
+  scheduleFlush(delay == null ? 90000 : delay);
+  renderBackup();
+}
+async function postBackup(payload) {
+  const r = await fetch(S.settings.backupUrl, {method: 'POST', headers: {'content-type': 'text/plain;charset=utf-8'},
+    body: JSON.stringify(Object.assign({secret: S.settings.backupSecret}, payload))});
+  let j = null;
+  try { j = await r.json(); } catch (e) { throw new Error('The backup address did not answer like the Zephyr script. Check the web app URL.'); }
+  if (!j.ok) throw new Error(j.error === 'Wrong secret' ? 'The backup secret does not match the one in the script.' : (j.error || 'Backup failed.'));
+  return j;
+}
+async function flushBackups() {
+  if (!backupOn()) return false;
+  if (BK.flushing) return BK.flushing;
+  const keys = Object.keys(BK.queue);
+  if (!keys.length) return true;
+  if (!navigator.onLine) { BK.error = 'Waiting for signal'; renderBackup(); scheduleFlush(120000); return false; }
+  BK.flushing = (async () => {
+    let ok = true;
+    for (const k of keys) {
+      const p = BK.queue[k];
+      try { await postBackup(p); if (BK.queue[k] === p) delete BK.queue[k]; BK.last = Date.now(); BK.error = ''; }
+      catch (e) { ok = false; BK.error = e instanceof TypeError ? 'Waiting for signal' : e.message; break; }
+    }
+    DB.put('kv', BK.queue, 'backupQueue').catch(() => {});
+    DB.put('kv', BK.last, 'backupLast').catch(() => {});
+    if (!ok) scheduleFlush(120000);
+    return ok;
+  })();
+  const result = await BK.flushing;
+  BK.flushing = false; renderBackup();
+  return result;
+}
+async function backupNow() {
+  if (!backupOn()) return say('Google Drive backup is not set up yet. Add it in Settings when you are parked.');
+  if (S.session) BK.queue['s_' + S.session.id] = sessionPayload(false);
+  BK.queue['d_' + S.doc.id] = docPayload(S.doc);
+  const ok = await flushBackups();
+  say(ok ? 'Backed up to Google Drive.' : "I couldn't reach Google Drive. I'll keep trying when you have signal.");
+}
+function backupLine() {
+  if (!backupOn()) return '';
+  const waiting = Object.keys(BK.queue).length;
+  if (BK.error) return `Drive: ${BK.error.toLowerCase().startsWith('waiting') ? 'waiting for signal' : 'problem, see Settings'}`;
+  if (waiting && !BK.last) return 'Drive: pending';
+  return BK.last ? `Drive: backed up ${fmtTime(BK.last)}` : 'Drive: ready';
+}
+function renderBackup() {
+  renderSession();
+  const el = $('#bkStatus'); if (!el) return;
+  if (!backupOn()) { el.textContent = 'Not set up.'; return; }
+  const waiting = Object.keys(BK.queue).length;
+  el.textContent = (BK.last ? `Last backup ${fmtDate(BK.last)} ${fmtTime(BK.last)}.` : 'No backups yet.') +
+    (waiting ? ` ${waiting} waiting to send.` : '') + (BK.error ? ` ${BK.error}` : '');
+}
+window.addEventListener('online', () => flushBackups());
+
+/* ================= rendering ================= */
+function showHeard(t, dim) { const el = $('#heard'); el.textContent = t; el.classList.toggle('dim', !!dim); }
+function showZephyr(t) { $('#oscarSaid').textContent = t; }
+function statusOf() {
+  if (S.busy) return ['thinking', 'Thinking'];
+  if (S.speaking) return ['speaking', 'Speaking'];
+  if (!wantListen) return ['off', 'Not listening'];
+  if (S.awaiting) return ['await', S.awaiting === 'command' ? 'Yes? Say a command' : 'Go ahead'];
+  const on = ['b', 'i', 'u'].filter(k => S.inline[k]).map(k => ({b: 'bold', i: 'italic', u: 'underline'}[k]));
+  const extra = on.length ? ' · ' + on.join(', ') : '';
+  if (S.mode === 'draft') return ['draft', 'Composing' + extra];
+  return ['listen', 'Listening for “Zephyr”' + extra];
+}
+function renderStatus() {
+  const [st, label] = statusOf();
+  const pill = $('#pill'); pill.dataset.state = st; pill.textContent = label;
+  const mic = $('#mic');
+  mic.setAttribute('aria-pressed', String(wantListen));
+  mic.dataset.state = wantListen && S.mode === 'draft' ? 'draft' : '';
+  $('#micLabel').textContent = wantListen ? (S.mode === 'draft' ? 'Composing · tap to stop' : 'Stop listening') : 'Start listening';
+}
+function renderSession() {
+  const el = $('#sessionInfo');
+  const bk = backupLine();
+  if (!S.session) { el.textContent = 'No session open' + (bk ? ' · ' + bk : ''); return; }
+  const n = S.session.versions.length;
+  el.textContent = `Session since ${fmtTime(S.session.startedAt)} · ${n} autosave${n === 1 ? '' : 's'}` + (bk ? ' · ' + bk : '');
+}
+function inlineHTML(s) {
+  let out = '', b = false, it = false, u = false, k = 0;
+  while (k < s.length) {
+    if (s.startsWith('**', k)) { out += b ? '</strong>' : '<strong>'; b = !b; k += 2; continue; }
+    if (s.startsWith('++', k)) { out += u ? '</u>' : '<u>'; u = !u; k += 2; continue; }
+    if (s[k] === '*') { out += it ? '</em>' : '<em>'; it = !it; k++; continue; }
+    out += esc(s[k]); k++;
+  }
+  return out + (it ? '</em>' : '') + (u ? '</u>' : '') + (b ? '</strong>' : '');
+}
+function renderDocHTML(text) {
+  let html = '', list = null, para = [];
+  const flush = () => { if (para.length) { html += `<p>${para.map(inlineHTML).join('<br>')}</p>`; para = []; } };
+  const closeList = () => { if (list) { html += `</${list}>`; list = null; } };
+  const pending = label => `<span class="pending">${label}: your next words go here</span>`;
+  for (const raw of String(text).split('\n')) {
+    let m;
+    if (!raw.trim()) { flush(); closeList(); continue; }
+    if ((m = raw.match(/^%(?:[ \t]+(.*))?$/))) { flush(); closeList(); html += `<h1 class="m-title">${m[1] && m[1].trim() ? inlineHTML(m[1]) : pending('Title')}</h1>`; continue; }
+    if ((m = raw.match(/^(#{1,4})(?:[ \t]+(.*))?$/))) { flush(); closeList(); const n = m[1].length; html += `<h${n + 1} class="m-h">${m[2] && m[2].trim() ? inlineHTML(m[2]) : pending('Heading ' + n)}</h${n + 1}>`; continue; }
+    if ((m = raw.match(/^[-*](?:[ \t]+(.*))?$/)) && (m[1] !== undefined || raw.trim() === '-')) {
+      flush(); if (list !== 'ul') { closeList(); html += '<ul>'; list = 'ul'; }
+      html += `<li>${m[1] && m[1].trim() ? inlineHTML(m[1]) : pending('Bullet')}</li>`; continue;
+    }
+    if ((m = raw.match(/^(\d+)[.)](?:[ \t]+(.*))?$/))) {
+      flush(); if (list !== 'ol') { closeList(); html += `<ol start="${+m[1]}">`; list = 'ol'; }
+      html += `<li>${m[2] && m[2].trim() ? inlineHTML(m[2]) : pending('Item')}</li>`; continue;
+    }
+    closeList(); para.push(raw);
+  }
+  flush(); closeList();
+  return html;
+}
+function render(fromTextarea) {
+  $('#docTitle').textContent = S.doc ? S.doc.title : '';
+  $('#wc').textContent = `${words(S.text)} words`;
+  if (!fromTextarea) $('#docText').value = S.text;
+  $('#docView').innerHTML = S.text.trim() ? renderDocHTML(S.text) : '<p class="pending">Say “Zephyr compose” and start talking, or say “Zephyr add to manuscript” after you speak.</p>';
+  if (document.activeElement !== $('#titleInput')) $('#titleInput').value = S.doc ? S.doc.title : '';
+  renderStatus(); renderSession();
+}
+function renderSuggestions() {
+  const box = $('#sugg');
+  box.hidden = !S.suggestions.length;
+  $('#suggList').innerHTML = S.suggestions.map(s => `<li>${esc(clean(s.say))}</li>`).join('');
+}
+let confirmDel = null;
+async function renderDocs() {
+  const docs = (await DB.all('docs')).sort((a, b) => b.updatedAt - a.updatedAt);
+  $('#docList').innerHTML = docs.map(d => {
+    const cur = S.doc && d.id === S.doc.id;
+    return `<li><div class="meta"><div class="t">${esc(d.title)}${cur ? '<span class="current-tag">Open</span>' : ''}</div>
+      <div class="s">${words(d.text)} words saved · ${fmtDate(d.updatedAt)} ${fmtTime(d.updatedAt)}</div></div>
+      <div class="row">${cur ? '' : `<button class="btn small" data-open="${d.id}" type="button">Open</button>
+      <button class="btn small danger" data-del="${d.id}" type="button">${confirmDel === d.id ? 'Tap again to delete' : 'Delete'}</button>`}</div></li>`;
+  }).join('');
+}
+let archiveCache = [];
+async function renderArchive() {
+  const all = await DB.all('sessions');
+  archiveCache = all.sort((a, b) => (b.endedAt || Infinity) - (a.endedAt || Infinity));
+  if (!archiveCache.length) { $('#archiveList').innerHTML = '<p class="note">No sessions yet.</p>'; return; }
+  $('#archiveList').innerHTML = archiveCache.map(s => {
+    const live = !s.endedAt;
+    const days = live ? null : Math.max(0, Math.ceil((s.endedAt + WEEK - Date.now()) / 86400000));
+    return `<details class="sess" data-sid="${s.id}"><summary>
+        <span><strong>${esc(s.docTitle)}</strong> · ${fmtDate(s.startedAt)} ${fmtTime(s.startedAt)}${live ? ' <span class="current-tag">In progress</span>' : ''}</span>
+        <span class="expires">${s.versions.length} autosaves${live ? '' : ` · deleted in ${days} day${days === 1 ? '' : 's'}`}</span>
+      </summary>
+      ${s.versions.map((v, i) => `<details class="ver" data-vi="${i}"><summary>${fmtTime(v.t)} · ${esc(v.label)} · ${words(v.text)} words</summary><div class="vbody"></div></details>`).join('')}
+    </details>`;
+  }).join('');
+}
+
+/* ================= wiring ================= */
+$('#mic').addEventListener('click', () => { if (wantListen) { stopListening(); stopSpeaking(); showZephyr('Stopped listening.'); } else startListening(); });
+$('#typeCmd').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('#cmdInput').value.trim(); if (!v) return;
+  $('#cmdInput').value = '';
+  if (wakeMatch(v)) handleFinal(v, true); else { stopSpeaking(); runCommand(v); }
+});
+function setView(raw) {
+  $('#viewFormatted').setAttribute('aria-pressed', String(!raw));
+  $('#viewRaw').setAttribute('aria-pressed', String(raw));
+  $('#docView').hidden = raw; $('#docText').hidden = !raw;
+  if (!raw) render();
+}
+$('#viewFormatted').addEventListener('click', () => setView(false));
+$('#viewRaw').addEventListener('click', () => setView(true));
+let typeTimer = null;
+$('#docText').addEventListener('input', () => {
+  clearTimeout(typeTimer);
+  typeTimer = setTimeout(() => setText($('#docText').value, 'Typed change', {coalesce: true, fromTextarea: true}), 900);
+});
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.removeAttribute('aria-current'));
+  b.setAttribute('aria-current', 'page');
+  document.querySelectorAll('main > .view').forEach(v => { v.hidden = v.id !== b.dataset.view; });
+  if (b.dataset.view === 'v-docs') renderDocs();
+  if (b.dataset.view === 'v-archive') renderArchive();
+  window.scrollTo(0, 0);
+}));
+$('#titleInput').addEventListener('change', async e => { const v = e.target.value.trim(); if (v && v !== S.doc.title) { S.doc.title = v; await DB.put('docs', S.doc); queueBackup('d_' + S.doc.id, docPayload(S.doc), 5000); if (S.session) { S.session.docTitle = v; saveSession(); } render(); renderDocs(); } });
+$('#btnEnd').addEventListener('click', () => endSession({announce: true, stop: true}));
+$('#btnFromCurrent').addEventListener('click', () => createNew(false));
+$('#btnBlank').addEventListener('click', () => createNew(true));
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; }
+  catch (e) { const ta = $('#docText'); ta.focus(); ta.select(); btn.textContent = 'Selected, copy it'; }
+  setTimeout(() => { btn.textContent = btn.dataset.label || 'Copy text'; }, 1800);
+}
+$('#btnCopy').addEventListener('click', e => copyText(plain(S.text), e.currentTarget));
+$('#btnCopyFmt').addEventListener('click', async e => {
+  const b = e.currentTarget, html = renderDocHTML(S.text);
+  try {
+    await navigator.clipboard.write([new ClipboardItem({'text/html': new Blob([html], {type: 'text/html'}), 'text/plain': new Blob([plain(S.text)], {type: 'text/plain'})})]);
+    b.textContent = 'Copied';
+  } catch (x) { return copyText(plain(S.text), b); }
+  setTimeout(() => { b.textContent = 'Copy formatted'; }, 1800);
+});
+$('#btnTxt').addEventListener('click', () => {
+  const blob = new Blob([plain(S.text)], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = (S.doc.title || 'draft').replace(/[^\w\- ]+/g, '').trim() + '.txt';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+$('#docList').addEventListener('click', async e => {
+  const o = e.target.closest('[data-open]'), d = e.target.closest('[data-del]');
+  if (o) { const doc = await DB.get('docs', o.dataset.open); if (doc) { await openDoc(doc); showZephyr(`Opened ${doc.title}.`); } }
+  if (d) {
+    if (confirmDel === d.dataset.del) { await DB.del('docs', d.dataset.del); confirmDel = null; }
+    else { confirmDel = d.dataset.del; setTimeout(() => { if (confirmDel === d.dataset.del) { confirmDel = null; renderDocs(); } }, 4000); }
+    renderDocs();
+  }
+});
+$('#archiveList').addEventListener('toggle', e => {
+  const ver = e.target.closest && e.target.closest('details.ver');
+  if (!ver || !ver.open) return;
+  const body = ver.querySelector('.vbody'); if (body.childElementCount) return;
+  const s = archiveCache.find(x => x.id === ver.closest('details.sess').dataset.sid);
+  const v = s && s.versions[+ver.dataset.vi]; if (!v) return;
+  body.innerHTML = `<pre></pre><div class="row"><button class="btn small" data-act="copy" type="button" data-label="Copy">Copy</button><button class="btn small" data-act="restore" type="button">Open as new document</button></div>`;
+  body.querySelector('pre').textContent = v.text;
+}, true);
+$('#archiveList').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const ver = b.closest('details.ver'), s = archiveCache.find(x => x.id === ver.closest('details.sess').dataset.sid);
+  const v = s.versions[+ver.dataset.vi];
+  if (b.dataset.act === 'copy') return copyText(v.text, b);
+  const d = await createDoc(`${s.docTitle} (restored ${fmtTime(v.t)})`, v.text);
+  await openDoc(d);
+  document.querySelector('.tabs button[data-view="v-write"]').click();
+  showZephyr(`Restored that version as ${d.title}.`);
+});
+// settings
+function bindSettings() {
+  const st = S.settings;
+  $('#apiKey').value = st.apiKey; $('#model').value = st.model; $('#lang').value = st.lang;
+  $('#rate').value = st.rate; $('#rateVal').textContent = (+st.rate).toFixed(2).replace(/0$/, ''); $('#lwt').checked = st.listenWhileTalking;
+  $('#apiKey').addEventListener('change', e => { st.apiKey = e.target.value.trim(); saveSettings(); });
+  $('#model').addEventListener('change', e => { st.model = e.target.value; saveSettings(); });
+  $('#lang').addEventListener('change', e => { st.lang = e.target.value; saveSettings(); if (rec) { try { rec.abort(); } catch (x) {} rec = null; if (wantListen) setTimeout(startRec, 400); } });
+  $('#voice').addEventListener('change', e => { st.voice = e.target.value; saveSettings(); });
+  $('#rate').addEventListener('input', e => { st.rate = +e.target.value; $('#rateVal').textContent = st.rate.toFixed(2).replace(/0$/, ''); saveSettings(); });
+  $('#lwt').addEventListener('change', e => { st.listenWhileTalking = e.target.checked; saveSettings(); });
+  $('#autoPunct').checked = st.autoPunct !== false;
+  $('#autoPunct').addEventListener('change', e => { st.autoPunct = e.target.checked; saveSettings(); });
+  $('#bkUrl').value = st.backupUrl; $('#bkSecret').value = st.backupSecret;
+  $('#bkUrl').addEventListener('change', e => { st.backupUrl = e.target.value.trim(); saveSettings(); BK.error = ''; renderBackup(); });
+  $('#bkSecret').addEventListener('change', e => { st.backupSecret = e.target.value.trim(); saveSettings(); BK.error = ''; renderBackup(); });
+  $('#btnBkTest').addEventListener('click', async e => {
+    const b = e.currentTarget, el = $('#bkStatus');
+    if (!backupOn()) { el.textContent = 'Fill in both the URL and the secret first.'; return; }
+    b.disabled = true; el.textContent = 'Testing…';
+    try { await postBackup({action: 'ping'}); el.textContent = 'Connected. Zephyr can save to your Google Drive.'; BK.error = ''; renderSession(); }
+    catch (x) { el.textContent = x instanceof TypeError ? "Couldn't reach the script. Check the URL and that the web app is shared with Anyone." : x.message; }
+    b.disabled = false;
+  });
+  $('#btnBkNow').addEventListener('click', () => backupNow());
+  $('#btnTestVoice').addEventListener('click', () => say('Hello. I am Zephyr. Say Zephyr compose when you are ready to write.'));
+}
+
+/* ================= boot ================= */
+(async function boot() {
+  try { await idb(); }
+  catch (e) { showZephyr('This browser blocked storage, so Zephyr cannot save. Open this page in a normal (not private) browser window.'); return; }
+  const saved = await DB.get('kv', 'settings');
+  if (saved) Object.assign(S.settings, saved);
+  bindSettings();
+  BK.queue = (await DB.get('kv', 'backupQueue')) || {};
+  BK.last = (await DB.get('kv', 'backupLast')) || 0;
+  renderBackup();
+  if (Object.keys(BK.queue).length) scheduleFlush(3000);
+  if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+  await purgeArchives();
+  const activeId = await DB.get('kv', 'activeSession');
+  if (activeId) {
+    const s = await DB.get('sessions', activeId);
+    const d = s && !s.endedAt ? await DB.get('docs', s.docId) : null;
+    if (s && d) {
+      S.doc = d; S.session = s;
+      S.text = s.versions[s.versions.length - 1].text;
+      S.undo = s.versions.slice(0, -1).map((v, i) => ({text: v.text, label: s.versions[i + 1].label, t: v.t}));
+      showZephyr(`Picked up your unfinished session on ${d.title}.`);
+    }
+  }
+  if (!S.doc) {
+    const lastId = await DB.get('kv', 'lastDoc');
+    S.doc = lastId ? await DB.get('docs', lastId) : null;
+    if (!S.doc) { const docs = await DB.all('docs'); S.doc = docs.sort((a, b) => b.updatedAt - a.updatedAt)[0] || await createDoc('Untitled draft', ''); }
+    S.text = S.doc.text || '';
+  }
+  DB.put('kv', S.doc.id, 'lastDoc').catch(() => {});
+  if (!SR) showZephyr('This browser cannot listen. On iPhone use Safari, on Android use Chrome.');
+  else if (!S.settings.apiKey) showZephyr('Composing and read-back work now. Add your Claude API key in Settings to turn on edit, feedback and explain.');
+  render();
+})();
+</script>
+</body>
+</html>
