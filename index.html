@@ -162,7 +162,6 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
         </div>
         <button id="mic" class="mic" aria-pressed="false" type="button"><span class="mic-dot"></span><span id="micLabel">Start listening</span></button>
         <div class="lines" aria-live="polite">
-          <p class="line"><span class="who">Heard</span><span id="heard" class="said dim">Tap Start listening and start talking.</span></p>
           <p class="line"><span class="who">Zephyr</span><span id="oscarSaid" class="said"></span></p>
         </div>
         <div id="sugg" class="sugg" hidden>
@@ -185,7 +184,7 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
         </div>
         <div id="docView" class="rendered"></div>
         <label for="docText" class="sr">Manuscript text</label>
-        <textarea hidden id="docText" spellcheck="true" placeholder="Say “Zephyr compose” and start talking, or say “Zephyr add to manuscript” after you speak. You can also type here when you’re parked."></textarea>
+        <textarea hidden id="docText" spellcheck="true" placeholder="Tap Start listening and talk. Everything you say lands here. You can also type here when you’re parked."></textarea>
       </div>
     </section>
 
@@ -219,14 +218,15 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
     <!-- COMMANDS -->
     <section id="v-cmds" class="view" hidden>
       <h2>Voice commands</h2>
-      <p class="note">Start every command with “Zephyr.” If you pause after “Zephyr,” you’ll hear a tone, then say the command.</p>
+      <p class="note">Everything you say goes into the manuscript unless you start with “Zephyr.” If you pause after “Zephyr,” you’ll hear a tone, then say the command.</p>
       <div class="cmds">
         <table>
           <thead><tr><th>Say</th><th>What happens</th></tr></thead>
           <tbody>
-            <tr><td>Zephyr compose</td><td>Start writing. Everything you say goes into the manuscript, except anything that starts with “Zephyr,” until you say “Zephyr pause.” Say “period,” “comma,” “question mark,” “new paragraph,” “open quote,” “close quote.”</td></tr>
-            <tr><td>Zephyr pause</td><td>Stop composing. Zephyr keeps listening for commands.</td></tr>
-            <tr><td>Zephyr add to manuscript</td><td>When you’re not composing, add everything you’ve said since your last command. Also “Zephyr add that.”</td></tr>
+            <tr><td>(just talk)</td><td>Whenever Zephyr is listening, everything you say goes into the manuscript, except anything that starts with “Zephyr.” Say “period,” “comma,” “question mark,” “new paragraph,” “open quote,” “close quote.”</td></tr>
+            <tr><td>Zephyr compose</td><td>Start writing again after a pause.</td></tr>
+            <tr><td>Zephyr pause</td><td>Stop adding what you say, for example to talk to someone in the car. Zephyr keeps listening for commands.</td></tr>
+            <tr><td>Zephyr add to manuscript</td><td>While paused, add everything you’ve said since your last command. Also “Zephyr add that.”</td></tr>
             <tr><td>Zephyr new paragraph</td><td>Start a new paragraph. In a list, starts the next item; say it twice to end the list. While composing you can also just say “new paragraph.”</td></tr>
             <tr><td>Zephyr new line</td><td>Start a new line in the same paragraph, or the next list item.</td></tr>
             <tr><td>Zephyr scratch that</td><td>Remove the last thing you dictated.</td></tr>
@@ -386,7 +386,7 @@ const DB = {
 /* ================= state ================= */
 const S = {
   doc: null, text: '', session: null, undo: [], redo: [],
-  mode: 'idle', busy: false, unsaved: [], inline: {b: false, i: false, u: false}, lastPolished: '', speaking: false, awaiting: null,
+  mode: 'draft', busy: false, unsaved: [], inline: {b: false, i: false, u: false}, lastPolished: '', speaking: false, awaiting: null,
   lastSpoken: '', echo: '', speechEnd: 0, lastRead: '', lastChunk: null,
   lastFinal: '', lastFinalAt: 0, suggestions: [], abort: null,
   settings: {apiKey: '', model: 'claude-sonnet-5-5', lang: 'en-US', voice: '', rate: 1, listenWhileTalking: true, backupUrl: '', backupSecret: '', autoPunct: true}
@@ -446,7 +446,7 @@ async function endSession({announce = true, stop = true} = {}) {
   queueBackup('s_' + S.session.id, sessionPayload(true), 0);
   const backupDone = backupOn() ? flushBackups() : null;
   await DB.put('kv', null, 'activeSession');
-  S.session = null; S.undo = []; S.redo = []; S.mode = 'idle';
+  S.session = null; S.undo = []; S.redo = []; S.mode = 'draft';
   render(); renderDocs(); renderArchive();
   if (announce) await say(`Session ended. I saved ${words(S.text)} words to ${S.doc.title}. ${n} autosave${n === 1 ? '' : 's'} are archived for one week.`);
   if (backupDone) { const ok = await backupDone; if (announce) await say(ok ? 'Backed up to Google Drive.' : 'The Google Drive backup will finish once you have signal.'); }
@@ -877,8 +877,8 @@ function pauseRecIfNeeded() { if (!S.settings.listenWhileTalking && wantListen &
 function resumeRec() { if (recPaused) { recPaused = false; if (wantListen) setTimeout(startRec, 250); } }
 async function startListening() {
   if (!SR) { say('This browser cannot listen. On iPhone use Safari, on Android use Chrome.'); return; }
-  wantListen = true; startRec(); renderStatus(); keepAwake();
-  if (!greeted) { greeted = true; say(S.session ? `Picking up your session on ${S.doc.title}. Say Zephyr help for commands.` : 'Listening. Say Zephyr compose to write, or Zephyr help for commands.'); }
+  wantListen = true; S.mode = 'draft'; startRec(); renderStatus(); keepAwake();
+  if (!greeted) { greeted = true; say(S.session ? `Picking up your session on ${S.doc.title}. Go ahead.` : 'Ready. Everything you say goes into the manuscript. Start with Zephyr to give a command.'); }
   else beep('ok');
 }
 function stopListening() {
@@ -894,7 +894,9 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 // "Zephyr" is rare in everyday speech, so recognisers often spell it oddly. These spellings always count.
 const WAKE_EXACT = new RegExp(String.raw`\b(?:hey\s+|okay\s+|ok\s+)?(?:zephyr(?:'s|s)?|zephyre|zephir|zephere|zepher|zephur|zefir|zeffir|zefer|zeffer|zefur|zafir|zafer|zaffer|zephy|zeph\s?(?:yr|ear|er|ir|fur)|z(?:ee|ed)?[\s-]?(?:fur|fir|fear|fer)|zeph)\b[\s,.:;!?-]*`, 'i');
 // These are real words, so they only count at the start of what you said and only when a command follows.
-const WAKE_SOFT = /^(?:sapphire|sapphires|safire|saffire|sephora|sefer|seffer|zephyrus|sapphire's)$/i;
+const WAKE_SOFT = /^(?:suffer|suffers|suffer's|sufferer|sofer|safer|saffer|sulfur|sapphire|sapphires|safire|saffire|sephora|sefer|seffer|zephyrus|sapphire's)$/i;
+// After a real word like "suffer" in the middle of a sentence, only these unmistakable command words count.
+const CMD_STRONG = new Set('read edit revise rewrite bold italic italics italicize underline compose pause undo redo scratch feedback explain heading header bulleted numbered backup rename repeat formatting apply'.split(' '));
 const CMD_START = new Set(('end finish close back backup save sync add put keep help commands formatting format style styles pause stop quiet ' +
   'hush enough cancel scratch strike undo redo read repeat word how why what apply accept edit revise rewrite change fix replace cut move ' +
   'insert delete remove feedback critique review suggest suggestions explain teach create make start rename call name list open switch ' +
@@ -912,9 +914,17 @@ function wakeMatch(t) {
       const r = [w + tail]; r.index = x.index; return r;
     }
   }
-  const lead = String(t).match(/^\s*(?:hey\s+|okay\s+|ok\s+)?([A-Za-z'’]+)([\s,.:;!?-]+)([A-Za-z]+)/);
-  if (lead && WAKE_SOFT.test(lead[1]) && CMD_START.has(lead[3].toLowerCase())) {
-    const r = [lead[0].slice(0, lead[0].length - lead[3].length)]; r.index = lead.index; return r;
+  const str = String(t);
+  // the sound-alike said on its own, e.g. a pause right after "Zephyr"
+  const alone = str.match(/^\s*(?:hey\s+|okay\s+|ok\s+)?([A-Za-z'’]+)[\s,.:;!?-]*$/);
+  if (alone && WAKE_SOFT.test(alone[1])) { const r = [str]; r.index = 0; return r; }
+  for (const x of str.matchAll(/([A-Za-z'’]+)([\s,.:;!?-]+)(?=([A-Za-z]+))/g)) {
+    if (!WAKE_SOFT.test(x[1])) continue;
+    const next = x[3].toLowerCase();
+    const atStart = /^\s*(?:(?:hey|okay|ok)\s+)?$/i.test(str.slice(0, x.index)) || /[.!?]\s*$/.test(str.slice(0, x.index));
+    if ((atStart && CMD_START.has(next)) || CMD_STRONG.has(next) || (next === 'new' && /^\s*(?:paragraph|line)\b/i.test(str.slice(x.index + x[0].length + 3)))) {
+      const r = [x[1] + x[2]]; r.index = x.index; return r;
+    }
   }
   return null;
 }
@@ -953,7 +963,7 @@ function handleFinal(raw, typed) {
   }
   if (!m) {
     if (S.mode === 'draft') { showHeard(t); dictate(t); }
-    else { S.unsaved.push(t); showHeard(S.unsaved.join(' '), true); showZephyr('Not in the manuscript yet. Say “Zephyr add to manuscript” to keep it.'); }
+    else { S.unsaved.push(t); showZephyr('Paused, so that wasn’t added. Say “Zephyr compose” to keep writing, or “Zephyr add to manuscript” to add it.'); }
     return;
   }
   const before = t.slice(0, m.index), after = afterWake(t);
@@ -963,7 +973,7 @@ function handleFinal(raw, typed) {
   runCommand(after);
 }
 
-const HELP = 'Say Zephyr, then a command. Compose, to start writing everything you say into the manuscript. Pause, to stop. Add to manuscript, to keep what you just said. Back up, to save to Google Drive. Scratch that. Read, or read last paragraph. Edit, then what to change. Feedback. Apply suggestion, and a number. Explain, then your question. Undo, or redo. Create new. Rename, then a name. Open, then a document name. Formatting help, for titles, headings, lists, bold, italic and underline. Word count. Repeat. Stop, to silence me. And end session, to save your draft.';
+const HELP = 'Everything you say goes into the manuscript. To give a command, say Zephyr first. Pause, to stop writing for a while. Compose, to start again. Add to manuscript, to keep what you just said. Back up, to save to Google Drive. Scratch that. Read, or read last paragraph. Edit, then what to change. Feedback. Apply suggestion, and a number. Explain, then your question. Undo, or redo. Create new. Rename, then a name. Open, then a document name. Formatting help, for titles, headings, lists, bold, italic and underline. Word count. Repeat. Stop, to silence me. And end session, to save your draft.';
 
 const FORMAT_HELP = 'Formatting commands. Say Zephyr, then: Title. Heading one, two, three or four. Normal text. Bulleted list. Numbered list. End list. New paragraph. New line. Bold, italic or underline, followed by that, last sentence, last word, or the words you want. Say bold on, then bold off, to format as you talk. Remove bold, or remove formatting, to undo it. You can add words right after a style, like: Zephyr heading two, chapter one.';
 const KEEP = true;
@@ -1008,7 +1018,7 @@ const COMMANDS = [
     S.mode = 'draft'; renderStatus();
     const said = takeUnsaved('');
     if (said) dictate(said);
-    if (m[1].trim()) { beep('ok'); dictate(m[1]); } else say('Composing. Everything you say goes into the manuscript. Say Zephyr pause to stop.');
+    if (m[1].trim()) { beep('ok'); dictate(m[1]); } else say('Composing.');
   }, KEEP]
 ];
 function addToManuscript(extra) {
@@ -1033,7 +1043,7 @@ function runCommand(raw) {
 /* ================= reading ================= */
 function readCmd(arg) {
   const a = norm(arg);
-  if (!S.text.trim()) return say('The document is empty. Say Zephyr compose and start talking.');
+  if (!S.text.trim()) return say('The document is empty. Just start talking.');
   const paras = paragraphs(S.text);
   let m;
   if (/\btitle\b/.test(a)) return say(`The title is ${S.doc.title}.`);
@@ -1152,7 +1162,7 @@ Then up to four blocks, most important first:
 ${MARKUP_NOTE}
 ${VOICE_RULES}`;
 async function runFeedback(focus) {
-  if (!S.text.trim()) return say('There is nothing to give feedback on yet. Say Zephyr compose and start talking.');
+  if (!S.text.trim()) return say('There is nothing to give feedback on yet. Just start talking.');
   if (!guardAI()) return;
   await withBusy('Reading your draft…', async () => {
     const out = await callClaude(FEEDBACK_SYS, `<document>\n${S.text}\n</document>` + (focus && focus.trim() ? `\n<focus>${focus.trim()}</focus>` : ''), 3000);
@@ -1293,7 +1303,7 @@ function renderBackup() {
 window.addEventListener('online', () => flushBackups());
 
 /* ================= rendering ================= */
-function showHeard(t, dim) { const el = $('#heard'); el.textContent = t; el.classList.toggle('dim', !!dim); }
+function showHeard() { /* no Heard line */ }
 function showZephyr(t) { $('#oscarSaid').textContent = t; }
 function statusOf() {
   if (S.busy) return ['thinking', 'Thinking'];
@@ -1357,7 +1367,7 @@ function render(fromTextarea) {
   $('#docTitle').textContent = S.doc ? S.doc.title : '';
   $('#wc').textContent = `${words(S.text)} words`;
   if (!fromTextarea) $('#docText').value = S.text;
-  $('#docView').innerHTML = S.text.trim() ? renderDocHTML(S.text) : '<p class="pending">Say “Zephyr compose” and start talking, or say “Zephyr add to manuscript” after you speak.</p>';
+  $('#docView').innerHTML = S.text.trim() ? renderDocHTML(S.text) : '<p class="pending">Tap Start listening and talk. Everything you say lands here.</p>';
   if (document.activeElement !== $('#titleInput')) $('#titleInput').value = S.doc ? S.doc.title : '';
   renderStatus(); renderSession();
 }
