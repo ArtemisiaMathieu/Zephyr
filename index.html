@@ -170,7 +170,7 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
         </div>
         <form id="typeCmd" class="typecmd" autocomplete="off">
           <label for="cmdInput" class="sr">Type a command</label>
-          <input id="cmdInput" placeholder="Or type one: Zephyr read last paragraph">
+          <input id="cmdInput" placeholder="Or type one: Zephyr please read last paragraph">
           <button class="btn" type="submit">Send</button>
         </form>
       </div>
@@ -211,53 +211,53 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
     <!-- ARCHIVE -->
     <section id="v-archive" class="view" hidden>
       <h2>Session autosaves</h2>
-      <p class="note">Zephyr autosaves every change during a session. When you say “Zephyr end session,” those autosaves move here for seven days, then they are deleted. The draft saved at the end of the session stays in Documents.</p>
+      <p class="note">Zephyr autosaves every change during a session. When you say “Zephyr please end session,” those autosaves move here for seven days, then they are deleted. The draft saved at the end of the session stays in Documents.</p>
       <div id="archiveList"></div>
     </section>
 
     <!-- COMMANDS -->
     <section id="v-cmds" class="view" hidden>
       <h2>Voice commands</h2>
-      <p class="note">Everything you say goes into the manuscript unless you start with “Zephyr.” If you pause after “Zephyr,” you’ll hear a tone, then say the command.</p>
+      <p class="note">Everything you say goes into the manuscript unless you start with “Zephyr please.” If you pause after “Zephyr please,” you’ll hear a tone, then say the command.</p>
       <div class="cmds">
         <table>
           <thead><tr><th>Say</th><th>What happens</th></tr></thead>
           <tbody>
-            <tr><td>(just talk)</td><td>Whenever Zephyr is listening, everything you say goes into the manuscript, except anything that starts with “Zephyr.” Say “period,” “comma,” “question mark,” “new paragraph,” “open quote,” “close quote.”</td></tr>
-            <tr><td>Zephyr compose</td><td>Start writing again after a pause.</td></tr>
-            <tr><td>Zephyr pause</td><td>Stop adding what you say, for example to talk to someone in the car. Zephyr keeps listening for commands.</td></tr>
-            <tr><td>Zephyr add to manuscript</td><td>While paused, add everything you’ve said since your last command. Also “Zephyr add that.”</td></tr>
-            <tr><td>Zephyr new paragraph</td><td>Start a new paragraph. In a list, starts the next item; say it twice to end the list. While composing you can also just say “new paragraph.”</td></tr>
-            <tr><td>Zephyr new line</td><td>Start a new line in the same paragraph, or the next list item.</td></tr>
-            <tr><td>Zephyr scratch that</td><td>Remove the last thing you dictated.</td></tr>
-            <tr><td>Zephyr read</td><td>Read the whole document. Also: “read last paragraph,” “read last sentence,” “read paragraph three,” “read last two paragraphs.”</td></tr>
-            <tr><td>Zephyr edit …</td><td>Make a change. “Zephyr edit cut the second sentence of the last paragraph.” “Zephyr change ‘cold’ to ‘bitter’ in the opening.”</td></tr>
-            <tr><td>Zephyr feedback</td><td>Hear feedback and numbered suggestions. Add a focus: “Zephyr feedback on pacing.”</td></tr>
-            <tr><td>Zephyr apply suggestion 2</td><td>Make that suggested edit. Also “apply suggestions one and three” or “apply all.”</td></tr>
-            <tr><td>Zephyr explain …</td><td>Ask how to edit. “Zephyr explain how to tighten a long opening.” Questions work too: “Zephyr how do I show this instead of telling it?”</td></tr>
-            <tr><td>Zephyr undo</td><td>Undo the last change this session. Also “undo all” and “redo.”</td></tr>
-            <tr><td>Zephyr create new</td><td>Save this document and start a new one that begins with a copy of it. “Create new blank” starts empty.</td></tr>
-            <tr><td>Zephyr rename …</td><td>Rename the current document. Also “Zephyr call it …”</td></tr>
-            <tr><td>Zephyr open …</td><td>Switch documents by name. “Zephyr list documents” reads the names.</td></tr>
+            <tr><td>(just talk)</td><td>Whenever Zephyr is listening, everything you say goes into the manuscript, except anything that starts with “Zephyr please.” Say “period,” “comma,” “question mark,” “new paragraph,” “open quote,” “close quote.”</td></tr>
+            <tr><td>Zephyr please compose</td><td>Start writing again after a pause.</td></tr>
+            <tr><td>Zephyr please pause</td><td>Stop adding what you say, for example to talk to someone in the car. Zephyr keeps listening for commands.</td></tr>
+            <tr><td>Zephyr please add to manuscript</td><td>While paused, add everything you’ve said since your last command. Also “Zephyr please add that.”</td></tr>
+            <tr><td>Zephyr please new paragraph</td><td>Start a new paragraph. In a list, starts the next item; say it twice to end the list. While composing you can also just say “new paragraph.”</td></tr>
+            <tr><td>Zephyr please new line</td><td>Start a new line in the same paragraph, or the next list item.</td></tr>
+            <tr><td>Zephyr please scratch that</td><td>Remove the last thing you dictated.</td></tr>
+            <tr><td>Zephyr please read</td><td>Read the whole document. Also: “read last paragraph,” “read last sentence,” “read paragraph three,” “read last two paragraphs.”</td></tr>
+            <tr><td>Zephyr please edit …</td><td>Make a change. “Zephyr please edit cut the second sentence of the last paragraph.” “Zephyr please change ‘cold’ to ‘bitter’ in the opening.”</td></tr>
+            <tr><td>Zephyr please feedback</td><td>Hear feedback and numbered suggestions. Add a focus: “Zephyr please feedback on pacing.”</td></tr>
+            <tr><td>Zephyr please apply suggestion 2</td><td>Make that suggested edit. Also “apply suggestions one and three” or “apply all.”</td></tr>
+            <tr><td>Zephyr please explain …</td><td>Ask how to edit. “Zephyr please explain how to tighten a long opening.” Questions work too: “Zephyr please how do I show this instead of telling it?”</td></tr>
+            <tr><td>Zephyr please undo</td><td>Undo the last change this session. Also “undo all” and “redo.”</td></tr>
+            <tr><td>Zephyr please create new</td><td>Save this document and start a new one that begins with a copy of it. “Create new blank” starts empty.</td></tr>
+            <tr><td>Zephyr please rename …</td><td>Rename the current document. Also “Zephyr please call it …”</td></tr>
+            <tr><td>Zephyr please open …</td><td>Switch documents by name. “Zephyr please list documents” reads the names.</td></tr>
             <tr><th colspan="2">Formatting</th></tr>
-            <tr><td>Zephyr title</td><td>Make the current paragraph the title. With words after it, adds a new title line: “Zephyr title, The Long Road North.”</td></tr>
-            <tr><td>Zephyr heading one</td><td>Heading 1. Also heading two, three and four. Add words to create the heading: “Zephyr heading two, chapter one.”</td></tr>
-            <tr><td>Zephyr normal text</td><td>Turn the current heading or list item back into an ordinary paragraph.</td></tr>
-            <tr><td>Zephyr bulleted list</td><td>Make the current paragraph a bullet, or start a list for your next words. Say “new paragraph” for the next bullet.</td></tr>
-            <tr><td>Zephyr numbered list</td><td>Same as bulleted list, with numbers.</td></tr>
-            <tr><td>Zephyr end list</td><td>Finish a list and go back to normal paragraphs.</td></tr>
-            <tr><td>Zephyr bold …</td><td>Bold part of the text: “Zephyr bold that,” “Zephyr bold last sentence,” “Zephyr bold last three words,” “Zephyr bold the words cold river.” Also “Zephyr make that bold.”</td></tr>
-            <tr><td>Zephyr italic …</td><td>Same targets as bold.</td></tr>
-            <tr><td>Zephyr underline …</td><td>Same targets as bold.</td></tr>
-            <tr><td>Zephyr bold on</td><td>Everything you say next is bold until “Zephyr bold off.” Works for italic and underline too.</td></tr>
-            <tr><td>Zephyr remove bold …</td><td>Take bold off that, the last sentence, or named words. “Zephyr remove formatting” clears bold, italic and underline.</td></tr>
-            <tr><td>Zephyr formatting help</td><td>Hear the formatting commands.</td></tr>
+            <tr><td>Zephyr please title</td><td>Make the current paragraph the title. With words after it, adds a new title line: “Zephyr please title, The Long Road North.”</td></tr>
+            <tr><td>Zephyr please heading one</td><td>Heading 1. Also heading two, three and four. Add words to create the heading: “Zephyr please heading two, chapter one.”</td></tr>
+            <tr><td>Zephyr please normal text</td><td>Turn the current heading or list item back into an ordinary paragraph.</td></tr>
+            <tr><td>Zephyr please bulleted list</td><td>Make the current paragraph a bullet, or start a list for your next words. Say “new paragraph” for the next bullet.</td></tr>
+            <tr><td>Zephyr please numbered list</td><td>Same as bulleted list, with numbers.</td></tr>
+            <tr><td>Zephyr please end list</td><td>Finish a list and go back to normal paragraphs.</td></tr>
+            <tr><td>Zephyr please bold …</td><td>Bold part of the text: “Zephyr please bold that,” “Zephyr please bold last sentence,” “Zephyr please bold last three words,” “Zephyr please bold the words cold river.” Also “Zephyr please make that bold.”</td></tr>
+            <tr><td>Zephyr please italic …</td><td>Same targets as bold.</td></tr>
+            <tr><td>Zephyr please underline …</td><td>Same targets as bold.</td></tr>
+            <tr><td>Zephyr please bold on</td><td>Everything you say next is bold until “Zephyr please bold off.” Works for italic and underline too.</td></tr>
+            <tr><td>Zephyr please remove bold …</td><td>Take bold off that, the last sentence, or named words. “Zephyr please remove formatting” clears bold, italic and underline.</td></tr>
+            <tr><td>Zephyr please formatting help</td><td>Hear the formatting commands.</td></tr>
             <tr><th colspan="2">Other</th></tr>
-            <tr><td>Zephyr word count</td><td>Hear the length.</td></tr>
-            <tr><td>Zephyr repeat</td><td>Hear Zephyr’s last answer again.</td></tr>
-            <tr><td>Zephyr back up</td><td>Send the current draft to Google Drive right now. Zephyr also backs up on its own every couple of minutes and at the end of each session.</td></tr>
-            <tr><td>Zephyr stop</td><td>Silence Zephyr, cancel a request in progress, or pause composing.</td></tr>
-            <tr><td>Zephyr end session</td><td>Save the draft, archive this session’s autosaves for one week, and stop listening.</td></tr>
+            <tr><td>Zephyr please word count</td><td>Hear the length.</td></tr>
+            <tr><td>Zephyr please repeat</td><td>Hear Zephyr’s last answer again.</td></tr>
+            <tr><td>Zephyr please back up</td><td>Send the current draft to Google Drive right now. Zephyr also backs up on its own every couple of minutes and at the end of each session.</td></tr>
+            <tr><td>Zephyr please stop</td><td>Silence Zephyr, cancel a request in progress, or pause composing.</td></tr>
+            <tr><td>Zephyr please end session</td><td>Save the draft, archive this session’s autosaves for one week, and stop listening.</td></tr>
           </tbody>
         </table>
       </div>
@@ -298,7 +298,7 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
       </div>
       <div class="field">
         <label><input id="lwt" type="checkbox" checked> Listen while Zephyr talks</label>
-        <small>Lets you say “Zephyr stop” in the middle of a read-back. If Zephyr hears itself through the car speakers, turn this off.</small>
+        <small>Lets you say “Zephyr please stop” in the middle of a read-back. If Zephyr hears itself through the car speakers, turn this off.</small>
       </div>
       <div class="field">
         <label><input id="autoPunct" type="checkbox" checked> Fix punctuation and capitals as I compose</label>
@@ -509,7 +509,7 @@ function undoAll() {
   const start = S.session.versions[0].text;
   if (start === S.text) return say('The document already matches the start of this session.');
   setText(start, 'Undo all');
-  say('Back to how the document was at the start of this session. Say Zephyr undo to bring the changes back.');
+  say('Back to how the document was at the start of this session. Say Zephyr please, undo to bring the changes back.');
 }
 function removeLastSentence(t) {
   const trimmed = t.replace(/\s+$/, '');
@@ -878,7 +878,7 @@ function resumeRec() { if (recPaused) { recPaused = false; if (wantListen) setTi
 async function startListening() {
   if (!SR) { say('This browser cannot listen. On iPhone use Safari, on Android use Chrome.'); return; }
   wantListen = true; S.mode = 'draft'; startRec(); renderStatus(); keepAwake();
-  if (!greeted) { greeted = true; say(S.session ? `Picking up your session on ${S.doc.title}. Go ahead.` : 'Ready. Everything you say goes into the manuscript. Start with Zephyr to give a command.'); }
+  if (!greeted) { greeted = true; say(S.session ? `Picking up your session on ${S.doc.title}. Go ahead.` : 'Ready. Everything you say goes into the manuscript. To give a command, start with Zephyr please.'); }
   else beep('ok');
 }
 function stopListening() {
@@ -891,39 +891,44 @@ function releaseAwake() { try { wakeLock && wakeLock.release(); } catch (e) {} w
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wantListen) { keepAwake(); if (!recRunning && !recPaused) startRec(); } });
 
 /* ================= routing what was heard ================= */
-// "Zephyr" is rare in everyday speech, so recognisers often spell it oddly. These spellings always count.
-const WAKE_EXACT = new RegExp(String.raw`\b(?:hey\s+|okay\s+|ok\s+)?(?:zephyr(?:'s|s)?|zephyre|zephir|zephere|zepher|zephur|zefir|zeffir|zefer|zeffer|zefur|zafir|zafer|zaffer|zephy|zeph\s?(?:yr|ear|er|ir|fur)|z(?:ee|ed)?[\s-]?(?:fur|fir|fear|fer)|zeph)\b[\s,.:;!?-]*`, 'i');
-// These are real words, so they only count at the start of what you said and only when a command follows.
-const WAKE_SOFT = /^(?:suffer|suffers|suffer's|sufferer|sofer|safer|saffer|sulfur|sapphire|sapphires|safire|saffire|sephora|sefer|seffer|zephyrus|sapphire's)$/i;
-// After a real word like "suffer" in the middle of a sentence, only these unmistakable command words count.
-const CMD_STRONG = new Set('read edit revise rewrite bold italic italics italicize underline compose pause undo redo scratch feedback explain heading header bulleted numbered backup rename repeat formatting apply'.split(' '));
+// Commands start with "Zephyr please". Anything else you say is writing.
+// "Zephyr" is rare, so phones often mishear it ("suffer", "safer", "sapphire", "Zefer"...).
+// The word "please" right after it is the anchor: the word (or two words) before "please" only has to SOUND like Zephyr.
+const WAKE_EXACT = /^(?:zephyr(?:'s|s)?|zephyre|zephir|zephere|zepher|zephur|zefir|zeffir|zefer|zeffer|zefur|zafir|zafer|zaffer|zeph|xephyr)$/i;
+const WAKE_SOFT = /^(?:suffer|suffers|sufferer|sofer|safer|saffer|sulfur|sulphur|sapphire|sapphires|safire|saffire|sephora|sefer|seffer|zephyrus|super|cipher|sever|the fur|z fur|zee fur|zed fur|zeph ear|zeph her|zef her|sef her|safe her|so far|sofa)$/i;
 const CMD_START = new Set(('end finish close back backup save sync add put keep help commands formatting format style styles pause stop quiet ' +
   'hush enough cancel scratch strike undo redo read repeat word how why what apply accept edit revise rewrite change fix replace cut move ' +
   'insert delete remove feedback critique review suggest suggestions explain teach create make start rename call name list open switch ' +
   'go compose composing draft dictate write resume continue new next title heading header normal plain bulleted bullet bullets ' +
   'numbered number numbering bold italic italics italicize underline turn no clear').split(' '));
-const skeleton = w => w.toLowerCase().replace(/ph/g, 'f').replace(/v/g, 'f').replace(/[aeiouyh'’]/g, '').replace(/(.)\1+/g, '$1');
+const soundsLikeZephyr = w => {
+  const k = w.toLowerCase().replace(/[^a-z]/g, '').replace(/ph/g, 'f').replace(/th/g, 's').replace(/[pv]/g, 'f').replace(/[zxc]/g, 's')
+    .replace(/[aeiouyhw]/g, '').replace(/(.)\1+/g, '$1');
+  return k === 'sfr';
+};
 function wakeMatch(t) {
-  const m = String(t).match(WAKE_EXACT);
-  if (m) return m;
-  // any word starting with z or x that sounds like z-f-r
-  for (const x of String(t).matchAll(/[A-Za-z'’]+/g)) {
-    const w = x[0];
-    if (/^[zx]/i.test(w) && w.length >= 4 && w.length <= 9 && /^[zx]fr$/.test(skeleton(w))) {
-      const tail = String(t).slice(x.index + w.length).match(/^[\s,.:;!?-]*/)[0];
-      const r = [w + tail]; r.index = x.index; return r;
-    }
-  }
   const str = String(t);
-  // the sound-alike said on its own, e.g. a pause right after "Zephyr"
-  const alone = str.match(/^\s*(?:hey\s+|okay\s+|ok\s+)?([A-Za-z'’]+)[\s,.:;!?-]*$/);
-  if (alone && WAKE_SOFT.test(alone[1])) { const r = [str]; r.index = 0; return r; }
-  for (const x of str.matchAll(/([A-Za-z'’]+)([\s,.:;!?-]+)(?=([A-Za-z]+))/g)) {
-    if (!WAKE_SOFT.test(x[1])) continue;
-    const next = x[3].toLowerCase();
-    const atStart = /^\s*(?:(?:hey|okay|ok)\s+)?$/i.test(str.slice(0, x.index)) || /[.!?]\s*$/.test(str.slice(0, x.index));
-    if ((atStart && CMD_START.has(next)) || CMD_STRONG.has(next) || (next === 'new' && /^\s*(?:paragraph|line)\b/i.test(str.slice(x.index + x[0].length + 3)))) {
-      const r = [x[1] + x[2]]; r.index = x.index; return r;
+  for (const p of str.matchAll(/\bpleas(?:e|ed)?\b[\s,.:;!?-]*/gi)) {
+    const before = str.slice(0, p.index).replace(/[\s,.:;!?-]+$/, '');
+    const ws = [...before.matchAll(/[A-Za-z'’]+/g)];
+    if (!ws.length) continue;
+    const after = str.slice(p.index + p[0].length);
+    const next = (after.match(/^[A-Za-z]+/) || [''])[0].toLowerCase();
+    for (const n of [1, 2]) {
+      if (ws.length < n) break;
+      const first = ws[ws.length - n], phrase = ws.slice(-n).map(x => x[0]).join(' ');
+      const exact = n === 1 && (WAKE_EXACT.test(phrase) || (/^[zx]/i.test(phrase) && soundsLikeZephyr(phrase)));
+      const soft = WAKE_SOFT.test(phrase) || soundsLikeZephyr(phrase.replace(/\s+/g, ''));
+      if (!exact && !soft) continue;
+      if (!exact) {
+        // a real word like "suffer" counts only at the start of what you said, right before a command, or on its own
+        const before1 = str.slice(0, first.index);
+        const atStart = /^\s*(?:(?:hey|okay|ok)\s+)?$/i.test(before1) || /[.!?]\s*$/.test(before1);
+        if (!(atStart || !after.trim() || CMD_START.has(next))) continue;
+      }
+      const lead = str.slice(0, first.index).match(/(?:\b(?:hey|okay|ok)\s+)?$/i)[0];
+      const start = first.index - lead.length;
+      const r = [str.slice(start, p.index + p[0].length)]; r.index = start; return r;
     }
   }
   return null;
@@ -963,7 +968,7 @@ function handleFinal(raw, typed) {
   }
   if (!m) {
     if (S.mode === 'draft') { showHeard(t); dictate(t); }
-    else { S.unsaved.push(t); showZephyr('Paused, so that wasn’t added. Say “Zephyr compose” to keep writing, or “Zephyr add to manuscript” to add it.'); }
+    else { S.unsaved.push(t); showZephyr('Paused, so that wasn’t added. Say “Zephyr please compose” to keep writing, or “Zephyr please add to manuscript” to add it.'); }
     return;
   }
   const before = t.slice(0, m.index), after = afterWake(t);
@@ -973,9 +978,9 @@ function handleFinal(raw, typed) {
   runCommand(after);
 }
 
-const HELP = 'Everything you say goes into the manuscript. To give a command, say Zephyr first. Pause, to stop writing for a while. Compose, to start again. Add to manuscript, to keep what you just said. Back up, to save to Google Drive. Scratch that. Read, or read last paragraph. Edit, then what to change. Feedback. Apply suggestion, and a number. Explain, then your question. Undo, or redo. Create new. Rename, then a name. Open, then a document name. Formatting help, for titles, headings, lists, bold, italic and underline. Word count. Repeat. Stop, to silence me. And end session, to save your draft.';
+const HELP = 'Everything you say goes into the manuscript. To give a command, start with Zephyr please. Pause, to stop writing for a while. Compose, to start again. Add to manuscript, to keep what you just said. Back up, to save to Google Drive. Scratch that. Read, or read last paragraph. Edit, then what to change. Feedback. Apply suggestion, and a number. Explain, then your question. Undo, or redo. Create new. Rename, then a name. Open, then a document name. Formatting help, for titles, headings, lists, bold, italic and underline. Word count. Repeat. Stop, to silence me. And end session, to save your draft.';
 
-const FORMAT_HELP = 'Formatting commands. Say Zephyr, then: Title. Heading one, two, three or four. Normal text. Bulleted list. Numbered list. End list. New paragraph. New line. Bold, italic or underline, followed by that, last sentence, last word, or the words you want. Say bold on, then bold off, to format as you talk. Remove bold, or remove formatting, to undo it. You can add words right after a style, like: Zephyr heading two, chapter one.';
+const FORMAT_HELP = 'Formatting commands. Say Zephyr please, then: Title. Heading one, two, three or four. Normal text. Bulleted list. Numbered list. End list. New paragraph. New line. Bold, italic or underline, followed by that, last sentence, last word, or the words you want. Say bold on, then bold off, to format as you talk. Remove bold, or remove formatting, to undo it. You can add words right after a style, like: Zephyr please heading two, chapter one.';
 const KEEP = true;
 const COMMANDS = [
   [/^(?:end|finish|close|save and end)\s+(?:the\s+|my\s+|this\s+)?session\b/i, () => endSession()],
@@ -996,7 +1001,7 @@ const COMMANDS = [
   [/^(?:make (?:it |this |that )?(?:a )?)?(?:numbered|number|numbering)(?: list)?\b[\s,:]*(.*)$/i, m => setBlock('number', 0, m[1]), KEEP],
   [/^(?:make (?:it |this |that )?(?:a )?)?(?:bulleted|bullet|bullets)(?: points?| list)?\b[\s,:]*(.*)$/i, m => setBlock('bullet', 0, m[1]), KEEP],
   [/^(?:turn on |start )?(bold|italics?|italicize|underline|underlined)\b[\s,:]*(.*)$/i, m => inlineCmd(m[1], m[2], false), KEEP],
-  [/^(?:pause|stop composing|done composing|stop drafting|done drafting|stop writing|stop dictating|stop dictation)\b/i, () => { S.mode = 'idle'; renderStatus(); say('Paused. Say Zephyr compose to continue.'); }],
+  [/^(?:pause|stop composing|done composing|stop drafting|done drafting|stop writing|stop dictating|stop dictation)\b/i, () => { S.mode = 'idle'; renderStatus(); say('Paused. Say Zephyr please, compose to continue.'); }],
   [STOPRE, () => { stopSpeaking(); if (S.mode === 'draft') { S.mode = 'idle'; renderStatus(); say('Composing paused.'); } else beep('down'); }],
   [/^(?:scratch that|delete that|strike that|scratch it)\b/i, () => scratch()],
   [/^undo\s+(?:all|everything|every change)\b/i, () => undoAll()],
@@ -1025,7 +1030,7 @@ function addToManuscript(extra) {
   const parts = S.unsaved.slice();
   if (extra && extra.trim()) parts.push(extra.trim());
   S.unsaved = [];
-  if (!parts.length) return say('There is nothing new to add. Say it again, then say Zephyr add to manuscript.');
+  if (!parts.length) return say('There is nothing new to add. Say it again, then say Zephyr please, add to manuscript.');
   dictate(parts.join(' '));
   beep('ok');
   showZephyr(`Added ${words(parts.join(' '))} words to the manuscript.`);
@@ -1037,7 +1042,7 @@ function runCommand(raw) {
     const m = c.match(re);
     if (m) { if (!keep && !/^(?:add|put|keep|save)\b/i.test(c)) S.unsaved = []; return fn(m, c); }
   }
-  say(`I heard, ${c}. That isn't a command I know. Say Zephyr help.`);
+  say(`I heard, ${c}. That isn't a command I know. Say Zephyr please, help.`);
 }
 
 /* ================= reading ================= */
@@ -1097,7 +1102,7 @@ async function withBusy(label, fn) {
 }
 const MARKUP_NOTE = 'The document uses formatting marks: a line starting with "% " is the title, "# " to "#### " are headings one to four, "- " is a bullet, "1. " is a numbered item, **bold**, *italic*, ++underline++. Keep these marks unless the instruction is about formatting; use them when it is. Never read the marks aloud or mention them by name.';
 const VOICE_RULES = 'Everything you say is read aloud by text-to-speech to a writer who is driving. Use plain spoken sentences. No markdown, no bullet symbols, no emoji, no headings.';
-const COMMAND_LIST = 'Zephyr commands she can say: Zephyr compose (everything she says then goes into the manuscript), Zephyr pause, Zephyr scratch that, Zephyr read (or read last paragraph, read paragraph three), Zephyr edit followed by the change, Zephyr feedback, Zephyr apply suggestion and a number, Zephyr explain followed by a question, Zephyr undo, Zephyr redo, Zephyr create new, Zephyr rename, Zephyr open, Zephyr end session. Formatting: Zephyr title, Zephyr heading one to four, Zephyr normal text, Zephyr bulleted list, Zephyr numbered list, Zephyr new paragraph, Zephyr bold or italic or underline followed by that, last sentence or the words, Zephyr remove formatting.';
+const COMMAND_LIST = 'Every command starts with Zephyr please. Commands she can say: Zephyr please compose (everything she says then goes into the manuscript), Zephyr please pause, Zephyr please scratch that, Zephyr please read (or read last paragraph, read paragraph three), Zephyr please edit followed by the change, Zephyr please feedback, Zephyr please apply suggestion and a number, Zephyr please explain followed by a question, Zephyr please undo, Zephyr please redo, Zephyr please create new, Zephyr please rename, Zephyr please open, Zephyr please end session. Formatting: Zephyr please title, Zephyr please heading one to four, Zephyr please normal text, Zephyr please bulleted list, Zephyr please numbered list, Zephyr please new paragraph, Zephyr please bold or italic or underline followed by that, last sentence or the words, Zephyr please remove formatting.';
 function editSystem(forceFull) {
   return `You are the editing engine inside Zephyr, a voice writing assistant. Apply the writer's spoken edit instruction to her document.
 Change only what the instruction requires and keep every other character exactly as it is. Preserve her voice and style. The instruction was transcribed from speech, so read past obvious mishearings. Phrases like "that sentence" or "what I just said" usually point to the most recent dictation or the passage most recently read aloud, both provided.
@@ -1173,24 +1178,24 @@ async function runFeedback(focus) {
     renderSuggestions();
     let speech = clean(spoken);
     S.suggestions.forEach((s, i) => { speech += ` Suggestion ${i + 1}. ${clean(s.say)}`; });
-    if (S.suggestions.length) speech += ' To use one, say Zephyr apply suggestion, and its number. Or say Zephyr apply all.';
+    if (S.suggestions.length) speech += ' To use one, say Zephyr please, apply suggestion, and its number. Or say Zephyr please, apply all.';
     S.busy = false; renderStatus();
     await say(speech || clean(out));
   });
 }
 function applyCmd(arg) {
-  if (!S.suggestions.length) return say('There are no suggestions yet. Say Zephyr feedback first.');
+  if (!S.suggestions.length) return say('There are no suggestions yet. Say Zephyr please, feedback first.');
   const a = String(arg || '').toLowerCase();
   let picks;
   if (/\b(all|everything|every|them)\b/.test(a)) picks = S.suggestions.map((_, i) => i + 1);
   else picks = a.split(/[\s,]+|\band\b/).map(num).filter(n => n && S.suggestions[n - 1]);
   picks = [...new Set(picks)];
-  if (!picks.length) { return say(`I have suggestions one through ${S.suggestions.length}. Say Zephyr apply suggestion, and a number.`); }
+  if (!picks.length) { return say(`I have suggestions one through ${S.suggestions.length}. Say Zephyr please, apply suggestion, and a number.`); }
   const instr = picks.length === 1 ? S.suggestions[picks[0] - 1].instruction
     : 'Make all of these changes:\n' + picks.map(n => `${n}. ${S.suggestions[n - 1].instruction}`).join('\n');
   return runEdit(instr);
 }
-const EXPLAIN_SYS = `You are Zephyr, a writing teacher talking with a writer while she drives. Answer her question about writing, revising or editing in under 150 words of plain spoken prose. Be concrete. When her document is relevant, refer to it by quoting a few of its words. When it helps, tell her exactly what to say to make the change, for example: say Zephyr edit, then cut the first sentence of the opening.
+const EXPLAIN_SYS = `You are Zephyr, a writing teacher talking with a writer while she drives. Answer her question about writing, revising or editing in under 150 words of plain spoken prose. Be concrete. When her document is relevant, refer to it by quoting a few of its words. When it helps, tell her exactly what to say to make the change, for example: say Zephyr please, edit, then cut the first sentence of the opening.
 ${COMMAND_LIST}
 ${MARKUP_NOTE}
 ${VOICE_RULES}`;
@@ -1209,7 +1214,7 @@ async function runExplain(q) {
 async function listDocs() {
   const docs = (await DB.all('docs')).sort((a, b) => b.updatedAt - a.updatedAt);
   const names = docs.slice(0, 8).map(d => d.title);
-  say(`You have ${docs.length} document${docs.length === 1 ? '' : 's'}: ${names.join(', ')}. Say Zephyr open, and a name.`);
+  say(`You have ${docs.length} document${docs.length === 1 ? '' : 's'}: ${names.join(', ')}. Say Zephyr please, open, and a name.`);
 }
 async function openByName(name) {
   const q = norm(name).replace(/^(?:the|my)\s+/, '').replace(/\s+(?:document|doc|draft|essay|story)$/, '');
@@ -1221,7 +1226,7 @@ async function openByName(name) {
     for (const w of q.split(' ')) if (w.length > 2 && t.includes(w)) s += 5;
     if (s > score) { score = s; best = d; }
   }
-  if (!best) return say(`I couldn't find a document called ${name}. Say Zephyr list documents.`);
+  if (!best) return say(`I couldn't find a document called ${name}. Say Zephyr please, list documents.`);
   if (S.doc && best.id === S.doc.id) return say(`You're already in ${best.title}.`);
   const had = !!S.session;
   await openDoc(best);
@@ -1510,7 +1515,7 @@ function bindSettings() {
     b.disabled = false;
   });
   $('#btnBkNow').addEventListener('click', () => backupNow());
-  $('#btnTestVoice').addEventListener('click', () => say('Hello. I am Zephyr. Say Zephyr compose when you are ready to write.'));
+  $('#btnTestVoice').addEventListener('click', () => say('Hello. I am Zephyr. Say Zephyr please, compose when you are ready to write.'));
 }
 
 /* ================= boot ================= */
