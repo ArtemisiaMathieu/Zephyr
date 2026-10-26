@@ -256,7 +256,7 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
             <tr><td>Zephyr please word count</td><td>Hear the length.</td></tr>
             <tr><td>Zephyr please repeat</td><td>Hear Zephyr’s last answer again.</td></tr>
             <tr><td>Zephyr please back up</td><td>Send the current draft to Google Drive right now. Zephyr also backs up on its own every couple of minutes and at the end of each session.</td></tr>
-            <tr><td>Zephyr please stop</td><td>Silence Zephyr, cancel a request in progress, or pause composing.</td></tr>
+            <tr><td>Zephyr please stop</td><td>Silence Zephyr or cancel a request in progress. Your writing keeps going.</td></tr>
             <tr><td>Zephyr please end session</td><td>Save the draft, archive this session’s autosaves for one week, and stop listening.</td></tr>
           </tbody>
         </table>
@@ -386,7 +386,7 @@ const DB = {
 /* ================= state ================= */
 const S = {
   doc: null, text: '', session: null, undo: [], redo: [],
-  mode: 'draft', busy: false, unsaved: [], inline: {b: false, i: false, u: false}, lastPolished: '', speaking: false, awaiting: null,
+  mode: 'draft', busy: false, heard: false, heldWhileBusy: [], unsaved: [], inline: {b: false, i: false, u: false}, lastPolished: '', speaking: false, awaiting: null,
   lastSpoken: '', echo: '', speechEnd: 0, lastRead: '', lastChunk: null,
   lastFinal: '', lastFinalAt: 0, suggestions: [], abort: null,
   settings: {apiKey: '', model: 'claude-sonnet-5-5', lang: 'en-US', voice: '', rate: 1, listenWhileTalking: true, backupUrl: '', backupSecret: '', autoPunct: true}
@@ -793,16 +793,21 @@ function speak(text, {remember = true} = {}) {
     const chunks = speechChunks(text);
     if (!chunks.length) return resolve();
     S.speaking = true; pauseRecIfNeeded(); renderStatus();
-    let i = 0;
+    let i = 0, guard = null;
+    const finish = () => { clearTimeout(guard); if (gen !== speakGen) return resolve(); speakGen++; S.speaking = false; S.speechEnd = Date.now(); renderStatus(); resumeRec(); resolve(); };
     const next = () => {
+      clearTimeout(guard);
       if (gen !== speakGen) return resolve();
-      if (i >= chunks.length) { S.speaking = false; S.speechEnd = Date.now(); renderStatus(); resumeRec(); return resolve(); }
-      const u = new SpeechSynthesisUtterance(chunks[i++]);
+      if (i >= chunks.length) return finish();
+      const chunk = chunks[i++];
+      const u = new SpeechSynthesisUtterance(chunk);
       u.rate = +S.settings.rate || 1;
       const v = pickVoice(); if (v) u.voice = v;
       u.lang = v ? v.lang : S.settings.lang;
       u.onend = next; u.onerror = next;
       speechSynthesis.speak(u);
+      // phones sometimes never report the end of speech; move on anyway so listening never stalls
+      guard = setTimeout(next, 2500 + chunk.length * 110 / (u.rate || 1));
     };
     setTimeout(next, 60);
   });
@@ -831,34 +836,42 @@ function beep(kind) {
 
 /* ================= speech input ================= */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, recRunning = false, recPaused = false, wantListen = false, wakeLock = null, greeted = false;
+let rec = null, recRunning = false, recPaused = false, wantListen = false, wakeLock = null, greeted = false, lastRecStart = 0;
+let hearTimer = null;
+function hearing() { if (S.heard) return; S.heard = true; renderStatus(); clearTimeout(hearTimer); hearTimer = setTimeout(() => { S.heard = false; renderStatus(); }, 1500); }
+// If the microphone has gone quiet on its own, start it again.
+setInterval(() => { if (wantListen && !recPaused && !recRunning) startRec(); }, 3000);
 const committed = {};
 let stallTimer = null;
 const wordsOf = t => String(t).trim().split(/\s+/).filter(Boolean);
 const bare = w => w.toLowerCase().replace(/[^a-z0-9']/g, '');
+let pendingParts = [];
 function commitPart(i, txt) {
   const prev = committed[i] || '';
   committed[i] = txt;
   if (!prev) return handleFinal(txt);
   const pw = wordsOf(prev), tw = wordsOf(txt);
-  if (tw.length <= pw.length) return;
-  for (let k = 0; k < pw.length; k++) if (bare(pw[k]) !== bare(tw[k])) return;
-  handleFinal(tw.slice(pw.length).join(' '));
+  // only the words beyond what was already written; if the phone revised an earlier word, still keep the new ones
+  if (tw.length > pw.length) handleFinal(tw.slice(pw.length).join(' '));
+}
+function flushPending() {
+  clearTimeout(stallTimer);
+  const p = pendingParts; pendingParts = [];
+  p.forEach(([i, txt]) => commitPart(i, txt));
 }
 function makeRec() {
   const r = new SR();
   r.continuous = true; r.interimResults = true; r.lang = S.settings.lang || 'en-US'; r.maxAlternatives = 1;
-  r.onstart = () => { recRunning = true; for (const k in committed) delete committed[k]; renderStatus(); };
+  r.onstart = () => { recRunning = true; lastRecStart = Date.now(); for (const k in committed) delete committed[k]; pendingParts = []; renderStatus(); };
   r.onresult = e => {
-    let interim = '';
     const pending = [];
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const res = e.results[i], txt = res[0].transcript;
-      if (res.isFinal) commitPart(i, txt); else { interim += txt; pending.push([i, txt]); }
+      if (res.isFinal) commitPart(i, txt); else pending.push([i, txt]);
     }
-    if (interim && !S.speaking) showHeard(interim, true);
     clearTimeout(stallTimer);
-    if (pending.length) stallTimer = setTimeout(() => pending.forEach(([i, txt]) => commitPart(i, txt)), 1600);
+    pendingParts = pending;
+    if (pending.length) { hearing(); stallTimer = setTimeout(flushPending, 1200); }
   };
   r.onerror = e => {
     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
@@ -867,12 +880,12 @@ function makeRec() {
     }
   };
   r.onend = () => {
-    recRunning = false; clearTimeout(stallTimer); renderStatus();
+    recRunning = false; flushPending(); renderStatus();
     if (wantListen && !recPaused) setTimeout(() => { if (wantListen && !recRunning && !recPaused) startRec(); }, 300);
   };
   return r;
 }
-function startRec() { if (!rec) rec = makeRec(); try { rec.start(); } catch (e) {} }
+function startRec() { if (!rec) rec = makeRec(); try { rec.start(); } catch (e) { if (Date.now() - lastRecStart > 8000 && !recRunning) { try { rec.abort(); } catch (x) {} rec = null; } } }
 function pauseRecIfNeeded() { if (!S.settings.listenWhileTalking && wantListen && rec) { recPaused = true; try { rec.abort(); } catch (e) {} } }
 function resumeRec() { if (recPaused) { recPaused = false; if (wantListen) setTimeout(startRec, 250); } }
 async function startListening() {
@@ -933,7 +946,7 @@ function wakeMatch(t) {
   }
   return null;
 }
-const STOPRE = /^(?:stop|quiet|hush|shush|enough|cancel|be quiet|stop talking|shut up|pause)\b/i;
+const STOPRE = /^(?:stop|quiet|hush|shush|enough|cancel|be quiet|stop talking|shut up)\b/i;
 let awaitTimer = null;
 function setAwait(kind, ms) { S.awaiting = kind; clearTimeout(awaitTimer); awaitTimer = setTimeout(() => { S.awaiting = null; renderStatus(); }, ms || 10000); renderStatus(); }
 function clearAwait() { S.awaiting = null; clearTimeout(awaitTimer); renderStatus(); }
@@ -954,17 +967,17 @@ function handleFinal(raw, typed) {
     if (isEcho(t)) return;
   } else if (S.speaking) stopSpeaking();
   if (S.busy) {
-    if (!!wakeMatch(t) && STOPRE.test(afterWake(t))) { S.abort && S.abort.abort(); showHeard(t); }
-    else showHeard(t + ' (still working, ignored)', true);
+    if (!!wakeMatch(t) && STOPRE.test(afterWake(t))) { S.abort && S.abort.abort(); return; }
+    if (!wakeMatch(t)) S.heldWhileBusy.push(t);   // written in as soon as Claude's change lands
     return;
   }
   const m = wakeMatch(t);
   if (S.awaiting && !m) {
-    const k = S.awaiting; clearAwait(); showHeard(t);
+    const k = S.awaiting; clearAwait();
     if (k === 'edit') return runEdit(t);
     if (k === 'explain') return runExplain(t);
     if (k === 'title') return rename(t);
-    return runCommand(t);
+    return runCommand(t, t);
   }
   if (!m) {
     if (S.mode === 'draft') { showHeard(t); dictate(t); }
@@ -974,8 +987,8 @@ function handleFinal(raw, typed) {
   const before = t.slice(0, m.index), after = afterWake(t);
   if (before.trim()) { if (S.mode === 'draft') dictate(before); else S.unsaved.push(before.trim()); }
   clearAwait();
-  if (!after.trim()) { showHeard('Zephyr…'); setAwait('command', 9000); beep('wake'); return; }
-  runCommand(after);
+  if (!after.trim()) { setAwait('command', 9000); beep('wake'); return; }
+  runCommand(after, t.slice(m.index));
 }
 
 const HELP = 'Everything you say goes into the manuscript. To give a command, start with Zephyr please. Pause, to stop writing for a while. Compose, to start again. Add to manuscript, to keep what you just said. Back up, to save to Google Drive. Scratch that. Read, or read last paragraph. Edit, then what to change. Feedback. Apply suggestion, and a number. Explain, then your question. Undo, or redo. Create new. Rename, then a name. Open, then a document name. Formatting help, for titles, headings, lists, bold, italic and underline. Word count. Repeat. Stop, to silence me. And end session, to save your draft.';
@@ -1002,7 +1015,7 @@ const COMMANDS = [
   [/^(?:make (?:it |this |that )?(?:a )?)?(?:bulleted|bullet|bullets)(?: points?| list)?\b[\s,:]*(.*)$/i, m => setBlock('bullet', 0, m[1]), KEEP],
   [/^(?:turn on |start )?(bold|italics?|italicize|underline|underlined)\b[\s,:]*(.*)$/i, m => inlineCmd(m[1], m[2], false), KEEP],
   [/^(?:pause|stop composing|done composing|stop drafting|done drafting|stop writing|stop dictating|stop dictation)\b/i, () => { S.mode = 'idle'; renderStatus(); say('Paused. Say Zephyr please, compose to continue.'); }],
-  [STOPRE, () => { stopSpeaking(); if (S.mode === 'draft') { S.mode = 'idle'; renderStatus(); say('Composing paused.'); } else beep('down'); }],
+  [STOPRE, () => { stopSpeaking(); beep('down'); }],
   [/^(?:scratch that|delete that|strike that|scratch it)\b/i, () => scratch()],
   [/^undo\s+(?:all|everything|every change)\b/i, () => undoAll()],
   [/^undo\b/i, () => undo()],
@@ -1035,13 +1048,14 @@ function addToManuscript(extra) {
   beep('ok');
   showZephyr(`Added ${words(parts.join(' '))} words to the manuscript.`);
 }
-function runCommand(raw) {
+function runCommand(raw, original) {
   const c = String(raw).trim().replace(/^[\s,.:;!?-]+/, '').replace(/[.!?]+$/, '').trim();
-  showHeard('Zephyr, ' + c);
   for (const [re, fn, keep] of COMMANDS) {
     const m = c.match(re);
     if (m) { if (!keep && !/^(?:add|put|keep|save)\b/i.test(c)) S.unsaved = []; return fn(m, c); }
   }
+  // Not a command, so it was probably your writing. Put it in the manuscript.
+  if (original && S.mode === 'draft') { dictate(original); showZephyr('That wasn’t a command, so I added it to the manuscript. Say Zephyr please undo if it shouldn’t be there.'); return; }
   say(`I heard, ${c}. That isn't a command I know. Say Zephyr please, help.`);
 }
 
@@ -1068,7 +1082,11 @@ function readCmd(arg) {
 /* ================= Claude ================= */
 async function callClaude(system, user, maxTokens, opts = {}) {
   let r;
-  const signal = 'signal' in opts ? (opts.signal || undefined) : (S.abort ? S.abort.signal : undefined);
+  const outer = 'signal' in opts ? opts.signal : (S.abort ? S.abort.signal : null);
+  const ctl = new AbortController(), signal = ctl.signal;
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; ctl.abort(); }, opts.timeout || 60000);
+  if (outer) outer.addEventListener('abort', () => ctl.abort(), {once: true});
   try {
     r = await fetch(API, {
       method: 'POST', signal,
@@ -1076,11 +1094,13 @@ async function callClaude(system, user, maxTokens, opts = {}) {
       body: JSON.stringify({model: opts.model || S.settings.model, max_tokens: maxTokens, system, messages: [{role: 'user', content: user}]})
     });
   } catch (e) {
-    if (e.name === 'AbortError') throw e;
+    clearTimeout(timer);
+    if (e.name === 'AbortError' && !timedOut) throw e;
     throw new Error("I couldn't reach Claude. You may be out of signal. Try again in a minute.");
   }
   let j = {};
   try { j = await r.json(); } catch (e) {}
+  clearTimeout(timer);
   if (!r.ok) {
     if (r.status === 401) throw new Error('Your API key was rejected. Check it in Settings when you are parked.');
     if (r.status === 429 || r.status === 529) throw new Error('Claude is busy right now. Try again in a moment.');
@@ -1098,7 +1118,11 @@ async function withBusy(label, fn) {
   S.busy = true; S.abort = new AbortController(); showZephyr(label); renderStatus(); beep('ok');
   try { await fn(); }
   catch (e) { S.busy = false; renderStatus(); await say(e.name === 'AbortError' ? 'Cancelled.' : e.message); }
-  finally { S.busy = false; S.abort = null; renderStatus(); }
+  finally {
+    S.busy = false; S.abort = null; renderStatus();
+    const held = S.heldWhileBusy; S.heldWhileBusy = [];
+    held.forEach(t => handleFinal(t, true));
+  }
 }
 const MARKUP_NOTE = 'The document uses formatting marks: a line starting with "% " is the title, "# " to "#### " are headings one to four, "- " is a bullet, "1. " is a numbered item, **bold**, *italic*, ++underline++. Keep these marks unless the instruction is about formatting; use them when it is. Never read the marks aloud or mention them by name.';
 const VOICE_RULES = 'Everything you say is read aloud by text-to-speech to a writer who is driving. Use plain spoken sentences. No markdown, no bullet symbols, no emoji, no headings.';
@@ -1317,7 +1341,8 @@ function statusOf() {
   if (S.awaiting) return ['await', S.awaiting === 'command' ? 'Yes? Say a command' : 'Go ahead'];
   const on = ['b', 'i', 'u'].filter(k => S.inline[k]).map(k => ({b: 'bold', i: 'italic', u: 'underline'}[k]));
   const extra = on.length ? ' · ' + on.join(', ') : '';
-  if (S.mode === 'draft') return ['draft', 'Composing' + extra];
+  if (S.mode === 'draft') return ['draft', (S.heard ? 'Writing…' : 'Composing') + extra];
+  if (S.mode === 'idle') return ['await', 'Paused · say Zephyr please compose' + extra];
   return ['listen', 'Listening for “Zephyr”' + extra];
 }
 function renderStatus() {
@@ -1326,7 +1351,7 @@ function renderStatus() {
   const mic = $('#mic');
   mic.setAttribute('aria-pressed', String(wantListen));
   mic.dataset.state = wantListen && S.mode === 'draft' ? 'draft' : '';
-  $('#micLabel').textContent = wantListen ? (S.mode === 'draft' ? 'Composing · tap to stop' : 'Stop listening') : 'Start listening';
+  $('#micLabel').textContent = wantListen ? (S.mode === 'draft' ? 'Composing · tap to stop' : 'Paused · tap to stop') : 'Start listening';
 }
 function renderSession() {
   const el = $('#sessionInfo');
