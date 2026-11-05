@@ -301,8 +301,9 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
         <small>Lets you say “Zephyr please stop” in the middle of a read-back. If Zephyr hears itself through the car speakers, turn this off.</small>
       </div>
       <div class="field">
-        <label><input id="autoPunct" type="checkbox" checked> Fix punctuation and capitals as I compose</label>
-        <small>A few seconds after you pause, Claude adds punctuation and fixes capital letters in what you just said. It never changes your words. Needs the API key above.</small>
+        <label><input id="autoPunct" type="checkbox" checked> Fix grammar and punctuation as I compose</label>
+        <small>As you talk, Claude fixes punctuation, capitals, grammar and words the phone misheard in what you just said, without rewording it. Needs the API key above. Say “Zephyr please undo” to reverse a fix.</small>
+        <small id="polishNote">Ready.</small>
       </div>
       <div class="row"><button class="btn" id="btnTestVoice" type="button">Test voice</button></div>
 
@@ -321,6 +322,10 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
         <button class="btn" id="btnBkNow" type="button">Back up now</button>
       </div>
       <p class="note" id="bkStatus" style="margin-top:10px">Not set up.</p>
+
+      <h2>Setup link</h2>
+      <p class="note">Your phone can erase this app’s settings, for example Safari does after about a week without opening it. Copy this link and keep it somewhere private, like a note on your phone. Opening it puts your API key, backup URL, secret and other settings back. It contains your keys, so don’t share it.</p>
+      <div class="row"><button class="btn" id="btnSetupLink" type="button" data-label="Copy setup link">Copy setup link</button></div>
     </section>
   </main>
 
@@ -386,7 +391,7 @@ const DB = {
 /* ================= state ================= */
 const S = {
   doc: null, text: '', session: null, undo: [], redo: [],
-  mode: 'draft', busy: false, heard: false, heldWhileBusy: [], unsaved: [], inline: {b: false, i: false, u: false}, lastPolished: '', speaking: false, awaiting: null,
+  mode: 'draft', busy: false, heard: false, polishedTo: 0, heldWhileBusy: [], unsaved: [], inline: {b: false, i: false, u: false}, lastPolished: '', speaking: false, awaiting: null,
   lastSpoken: '', echo: '', speechEnd: 0, lastRead: '', lastChunk: null,
   lastFinal: '', lastFinalAt: 0, suggestions: [], abort: null,
   settings: {apiKey: '', model: 'claude-sonnet-5-5', lang: 'en-US', voice: '', rate: 1, listenWhileTalking: true, backupUrl: '', backupSecret: '', autoPunct: true}
@@ -412,7 +417,7 @@ const COALESCE = new Set(['Dictation', 'Typed change']);
 function autosave(label) {
   if (!S.session) return;
   const v = S.session.versions, last = v[v.length - 1], now = Date.now();
-  if (last && label === 'Punctuation') { last.text = S.text; }
+  if (last && label === 'Grammar and punctuation') { last.text = S.text; }
   else if (last && COALESCE.has(label) && last.label === label && now - last.t < 60000) { last.text = S.text; last.t = now; }
   else v.push({t: now, label, text: S.text});
   saveSession();
@@ -427,6 +432,9 @@ function setText(next, label, opts = {}) {
     else S.undo.push({text: S.text, label, t: Date.now()});
     S.redo = [];
   }
+  let cp = 0; const lim = Math.min(S.text.length, next.length);
+  while (cp < lim && S.text[cp] === next[cp]) cp++;
+  if (label !== 'Grammar and punctuation' && S.polishedTo > cp) S.polishedTo = cp;
   S.text = next;
   autosave(label);
   render(opts.fromTextarea);
@@ -450,6 +458,7 @@ async function endSession({announce = true, stop = true} = {}) {
   render(); renderDocs(); renderArchive();
   if (announce) await say(`Session ended. I saved ${words(S.text)} words to ${S.doc.title}. ${n} autosave${n === 1 ? '' : 's'} are archived for one week.`);
   if (backupDone) { const ok = await backupDone; if (announce) await say(ok ? 'Backed up to Google Drive.' : 'The Google Drive backup will finish once you have signal.'); }
+  else if (announce) await say('This draft is saved on this phone only, because Google Drive backup is not set up. Add it in Settings when you are parked.');
   if (stop) stopListening();
 }
 async function createDoc(title, text) {
@@ -460,7 +469,7 @@ async function createDoc(title, text) {
 }
 async function openDoc(doc) {
   if (S.session && S.session.docId !== doc.id) await endSession({announce: false, stop: false});
-  S.doc = doc; S.text = doc.text || ''; S.suggestions = []; S.lastChunk = null;
+  S.doc = doc; S.text = doc.text || ''; S.suggestions = []; S.lastChunk = null; S.polishedTo = S.text.length;
   DB.put('kv', doc.id, 'lastDoc').catch(() => {});
   render(); renderDocs();
 }
@@ -606,47 +615,109 @@ function dictate(raw) {
   schedulePolish();
 }
 
-/* ================= automatic punctuation (Claude) ================= */
-let polishTimer = null, polishing = false;
-const letters = t => plain(t).toLowerCase().replace(/[^a-z0-9]/g, '');
+/* ================= automatic grammar & punctuation (Claude) ================= */
+// Everything after S.polishedTo has not been checked yet. Zephyr works through it in order,
+// so nothing you say is skipped, however long you talk without pausing.
+let polishTimer = null, polishing = false, polishFirstWait = 0;
+const PG = {state: 'idle', msg: '', at: 0, warned: false, model: null};
 const markup = t => String(t).replace(/[^*+#%\n]/g, '');
-function schedulePolish() {
-  if (!S.settings.autoPunct || !S.settings.apiKey) return;
+const wordList = t => (plain(t).toLowerCase().match(/[a-z0-9'’]+/g) || []).map(w => w.replace(/’/g, "'"));
+function wordDistance(a, b) {
+  const n = a.length, m = b.length; let prev = Array.from({length: m + 1}, (_, j) => j);
+  for (let i = 1; i <= n; i++) {
+    const cur = [i];
+    for (let j = 1; j <= m; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[m];
+}
+function setPolishStatus(state, msg) { PG.state = state; PG.msg = msg || ''; PG.at = Date.now(); renderSession(); renderPolishNote(); }
+function renderPolishNote() {
+  const el = $('#polishNote'); if (!el) return;
+  if (!S.settings.autoPunct) { el.textContent = 'Off.'; return; }
+  if (!S.settings.apiKey) { el.textContent = 'Waiting for your Claude API key above.'; return; }
+  el.textContent = PG.state === 'error' ? 'Stopped: ' + PG.msg : PG.state === 'ok' ? `Working. Last fix at ${fmtTime(PG.at)}.` : 'Ready.';
+}
+function polishLine() {
+  if (!S.settings.autoPunct) return '';
+  if (!S.settings.apiKey) return 'Grammar: needs API key';
+  if (PG.state === 'error') return 'Grammar: stopped, see Settings';
+  return '';
+}
+function schedulePolish(delay) {
+  if (!S.settings.autoPunct) return;
+  if (!S.settings.apiKey) { setPolishStatus('error', 'Add your Claude API key in Settings to turn on grammar fixes.'); return; }
+  const now = Date.now();
+  if (!polishFirstWait) polishFirstWait = now;
+  // wait for a short pause, but never more than 15 seconds while you keep talking
+  const wait = delay != null ? delay : Math.max(0, Math.min(2500, polishFirstWait + 15000 - now));
   clearTimeout(polishTimer);
-  polishTimer = setTimeout(polishTail, 3500);
+  polishTimer = setTimeout(runPolish, wait);
 }
-function tailStart(t) {
-  const i = t.lastIndexOf('\n\n'), j = i > 0 ? t.lastIndexOf('\n\n', i - 1) : -1;
-  let st = j >= 0 ? j + 2 : 0;
-  if (t.length - st > 1500) { const k = t.indexOf('. ', t.length - 1200); st = k > 0 ? k + 2 : t.length - 1200; }
-  return st;
+function sentenceStartBefore(t, i) {
+  let k = i;
+  while (k > 0) { const c = t[k - 1]; if (c === '\n') break; if (/[.?!…]/.test(c) && /\s/.test(t[k] || ' ')) break; k--; }
+  return k;
 }
-const POLISH_SYS = `You fix punctuation, capitalization and spacing in text a writer dictated by voice.
-Never add, remove, replace or reorder words. You may change capital letters, add or change punctuation, and split run-on sentences.
-Capitalize names and the first word of each sentence. Lowercase words that were capitalized by mistake in the middle of a sentence.
-The text uses formatting marks: a line starting with "% " is a title, "# " to "#### " are headings, "- " is a bullet, "1. " is a numbered item, **bold**, *italic*, ++underline++. Keep every mark and every line break exactly where it is.
-The final sentence may be unfinished because she is still talking, so add no punctuation at the very end.
-Reply with only the corrected text inside <text></text>.`;
-async function polishTail() {
-  if (polishing || S.busy || !navigator.onLine) { if (S.settings.autoPunct) schedulePolish(); return; }
-  const text = S.text, st = tailStart(text), seg = text.slice(st);
-  if (words(seg) < 3 || seg === S.lastPolished) return;
+const POLISH_SYS = `You are a copy editor for a writer who dictates by voice while driving. Fix the passage in <text>:
+- punctuation, capital letters and spacing, including splitting run-on sentences;
+- grammar mistakes such as subject-verb agreement, wrong tense endings and missing small words like "a" or "the";
+- obvious speech-recognition mistakes, such as the wrong one of "their/there/they're", "to/too/two", "its/it's", or a word that plainly sounds like the intended one.
+Do not rephrase, reorder, shorten or improve her style. Keep her word choices, dialect, slang and deliberate fragments. When unsure, leave it as it is.
+Capitalize names and the first word of each sentence; lowercase words that were capitalized by mistake mid-sentence.
+Formatting marks must stay exactly where they are: a line starting with "% " is a title, "# " to "#### " are headings, "- " is a bullet, "1. " is a numbered item, **bold**, *italic*, ++underline++. Keep every line break.
+<before> is earlier text for context only; never repeat or change it.
+If the last sentence looks unfinished because she is still talking, add no punctuation at its very end.
+Reply with only the corrected passage inside <text></text>.`;
+async function runPolish() {
+  polishTimer = null;
+  if (!S.settings.autoPunct || !S.settings.apiKey) return;
+  if (polishing) return schedulePolish(1500);
+  if (S.busy || !navigator.onLine) return schedulePolish(5000);
+  const text = S.text;
+  if (S.polishedTo > text.length) S.polishedTo = sentenceStartBefore(text, text.length);
+  let st = sentenceStartBefore(text, S.polishedTo);
+  if (text.slice(st).trim().length < 2 || words(text.slice(st)) < 2) { polishFirstWait = 0; return; }
+  let en = text.length;
+  if (en - st > 1800) { const cut = text.lastIndexOf('. ', st + 1800); en = cut > st ? cut + 1 : st + 1800; }
+  const seg = text.slice(st, en), more = en < text.length;
   polishing = true;
   try {
-    const out = await callClaude(POLISH_SYS, `<text>${seg}</text>`, 2000, {model: 'claude-haiku-5-5', signal: null});
+    const out = await callClaude(POLISH_SYS, `<before>${text.slice(Math.max(0, st - 400), st)}</before>\n<text>${seg}</text>`, 3000,
+      {model: PG.model || 'claude-haiku-5-5', signal: null, timeout: 30000});
     let fixed = tag(out, 'text');
-    if (fixed === null) return;
+    if (fixed === null) throw Object.assign(new Error('bad reply'), {soft: true});
     fixed = seg.match(/^\s*/)[0] + fixed.trim() + seg.match(/\s*$/)[0];
-    if (!/[.?!…]["”’)]?\s*$/.test(seg)) fixed = fixed.replace(/[.?!…]+(["”’)]?\s*)$/, '$1');
-    if (letters(fixed) !== letters(seg) || markup(fixed) !== markup(seg)) return;
-    if (fixed === seg || !S.text.startsWith(text)) return;
-    const next = text.slice(0, st) + fixed + S.text.slice(text.length);
-    const chunk = S.lastChunk && S.lastChunk.after === S.text ? S.lastChunk : null;
-    setText(next, 'Punctuation', {undoable: false});
-    S.lastChunk = chunk && next.startsWith(chunk.before) ? {before: chunk.before, after: next} : null;
-    S.lastPolished = fixed;
-  } catch (e) { /* punctuation is a nicety; never interrupt the writer */ }
-  finally { polishing = false; }
+    if (!more && !/[.?!…]["”’)]?\s*$/.test(seg)) fixed = fixed.replace(/[.?!…]+(["”’)]?\s*)$/, '$1');
+    const a = wordList(seg), b = wordList(fixed);
+    // allow real grammar fixes, but never a rewrite
+    const ok = markup(fixed) === markup(seg) && wordDistance(a, b) <= Math.max(3, Math.ceil(a.length * 0.2));
+    const current = S.text;
+    if (!current.startsWith(text.slice(0, en))) { schedulePolish(800); return; }   // you edited in the meantime; try again
+    if (ok && fixed !== seg) {
+      const chunk = S.lastChunk && S.lastChunk.after === current ? S.lastChunk : null;
+      const next = text.slice(0, st) + fixed + current.slice(en);
+      setText(next, 'Grammar and punctuation', {undoable: false});
+      S.lastChunk = chunk ? {before: chunk.before.length <= st ? chunk.before : next.slice(0, Math.min(chunk.before.length, st)), after: next} : null;
+      en = st + fixed.length;
+    }
+    // leave an unfinished last sentence to be checked again once you finish it
+    S.polishedTo = more ? en : sentenceStartBefore(S.text, en);
+    setPolishStatus('ok');
+    polishFirstWait = 0;
+    if (more) schedulePolish(300);
+  } catch (e) {
+    if (e.name === 'AbortError' || e.soft || e.offline) { schedulePolish(20000); return; }
+    const msg = String(e.apiMessage || e.message || '');
+    if ((e.status === 404 || /model/i.test(msg)) && !PG.model && S.settings.model !== 'claude-haiku-5-5') { PG.model = S.settings.model; schedulePolish(500); return; }
+    let why = 'Claude returned an error: ' + msg;
+    if (e.status === 401) why = 'your Claude API key was rejected. Check it in Settings.';
+    else if (/credit|billing|balance/i.test(msg)) why = 'your Claude API account is out of credit. Add credit at console.anthropic.com.';
+    else if (e.status === 429 || e.status === 529) { schedulePolish(30000); return; }
+    setPolishStatus('error', why);
+    if (!PG.warned) { PG.warned = true; say('Grammar fixes have stopped, because ' + why.replace(/console\.anthropic\.com/, 'the Anthropic console')); }
+    schedulePolish(120000);
+  } finally { polishing = false; }
 }
 
 /* ================= formatting ================= */
@@ -846,13 +917,31 @@ let stallTimer = null;
 const wordsOf = t => String(t).trim().split(/\s+/).filter(Boolean);
 const bare = w => w.toLowerCase().replace(/[^a-z0-9']/g, '');
 let pendingParts = [];
+// The phone keeps revising its transcript ("waited period" becomes "waited."), so find where the
+// already-written words end inside the new transcript and add only what comes after.
+function newWords(prev, txt) {
+  const raw = wordsOf(txt), pw = wordsOf(prev).map(bare).filter(Boolean);
+  const cw = [], at = [];
+  raw.forEach((w, k) => { const x = bare(w); if (x) { cw.push(x); at.push(k); } });
+  const n = pw.length, m = cw.length;
+  if (!n) return raw.join(' ');
+  let row = Array.from({length: m + 1}, (_, j) => j);
+  for (let i = 1; i <= n; i++) {
+    const cur = [i];
+    for (let j = 1; j <= m; j++) cur[j] = Math.min(row[j] + 1, cur[j - 1] + 1, row[j - 1] + (pw[i - 1] === cw[j - 1] ? 0 : 1));
+    row = cur;
+  }
+  let best = 0;
+  for (let j = 1; j <= m; j++) if (row[j] <= row[best]) best = j;
+  if (best >= m) return '';
+  return raw.slice(best === 0 ? 0 : at[best - 1] + 1).join(' ');
+}
 function commitPart(i, txt) {
   const prev = committed[i] || '';
   committed[i] = txt;
   if (!prev) return handleFinal(txt);
-  const pw = wordsOf(prev), tw = wordsOf(txt);
-  // only the words beyond what was already written; if the phone revised an earlier word, still keep the new ones
-  if (tw.length > pw.length) handleFinal(tw.slice(pw.length).join(' '));
+  const add = newWords(prev, txt);
+  if (add.trim()) handleFinal(add);
 }
 function flushPending() {
   clearTimeout(stallTimer);
@@ -891,7 +980,12 @@ function resumeRec() { if (recPaused) { recPaused = false; if (wantListen) setTi
 async function startListening() {
   if (!SR) { say('This browser cannot listen. On iPhone use Safari, on Android use Chrome.'); return; }
   wantListen = true; S.mode = 'draft'; startRec(); renderStatus(); keepAwake();
-  if (!greeted) { greeted = true; say(S.session ? `Picking up your session on ${S.doc.title}. Go ahead.` : 'Ready. Everything you say goes into the manuscript. To give a command, start with Zephyr please.'); }
+  if (!greeted) {
+    greeted = true;
+    const warn = (S.settings.autoPunct && !S.settings.apiKey ? ' Grammar fixes are off until you add your Claude API key in Settings.' : '') +
+      (!backupOn() ? ' Google Drive backup is not set up, so your writing is saved on this phone only.' : '');
+    say((S.session ? `Picking up your session on ${S.doc.title}. Go ahead.` : 'Ready. Everything you say goes into the manuscript. To give a command, start with Zephyr please.') + warn);
+  }
   else beep('ok');
 }
 function stopListening() {
@@ -1096,15 +1190,18 @@ async function callClaude(system, user, maxTokens, opts = {}) {
   } catch (e) {
     clearTimeout(timer);
     if (e.name === 'AbortError' && !timedOut) throw e;
-    throw new Error("I couldn't reach Claude. You may be out of signal. Try again in a minute.");
+    throw Object.assign(new Error("I couldn't reach Claude. You may be out of signal. Try again in a minute."), {offline: true});
   }
   let j = {};
   try { j = await r.json(); } catch (e) {}
   clearTimeout(timer);
   if (!r.ok) {
-    if (r.status === 401) throw new Error('Your API key was rejected. Check it in Settings when you are parked.');
-    if (r.status === 429 || r.status === 529) throw new Error('Claude is busy right now. Try again in a moment.');
-    throw new Error('Claude returned an error: ' + ((j.error && j.error.message) || r.status));
+    const apiMessage = (j.error && j.error.message) || String(r.status);
+    const fail = m => Object.assign(new Error(m), {status: r.status, apiMessage});
+    if (r.status === 401) throw fail('Your API key was rejected. Check it in Settings when you are parked.');
+    if (/credit|billing|balance/i.test(apiMessage)) throw fail('Your Claude API account is out of credit. Add credit at the Anthropic console when you are parked.');
+    if (r.status === 429 || r.status === 529) throw fail('Claude is busy right now. Try again in a moment.');
+    throw fail('Claude returned an error: ' + apiMessage);
   }
   if (j.stop_reason === 'max_tokens') throw new Error('That response ran too long for me to finish. Try a smaller request.');
   return (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
@@ -1295,7 +1392,10 @@ async function flushBackups() {
     let ok = true;
     for (const k of keys) {
       const p = BK.queue[k];
-      try { await postBackup(p); if (BK.queue[k] === p) delete BK.queue[k]; BK.last = Date.now(); BK.error = ''; }
+      try {
+        await postBackup(p); if (BK.queue[k] === p) delete BK.queue[k]; BK.last = Date.now(); BK.error = '';
+        if (p.action === 'saveDoc') { const d = await DB.get('docs', p.docId); if (d) { d.backedUpAt = Date.now(); await DB.put('docs', d); if (S.doc && S.doc.id === d.id) S.doc.backedUpAt = d.backedUpAt; } }
+      }
       catch (e) { ok = false; BK.error = e instanceof TypeError ? 'Waiting for signal' : e.message; break; }
     }
     DB.put('kv', BK.queue, 'backupQueue').catch(() => {});
@@ -1307,9 +1407,22 @@ async function flushBackups() {
   BK.flushing = false; renderBackup();
   return result;
 }
-async function backupNow() {
-  if (!backupOn()) return say('Google Drive backup is not set up yet. Add it in Settings when you are parked.');
+async function syncAllDocs() {
+  if (!backupOn()) return 0;
+  let n = 0;
+  for (const d of await DB.all('docs')) {
+    if (!(d.text || '').trim() && !(S.doc && d.id === S.doc.id && S.text.trim())) continue;
+    if (!d.backedUpAt || d.updatedAt > d.backedUpAt) { BK.queue['d_' + d.id] = docPayload(d); n++; }
+  }
   if (S.session) BK.queue['s_' + S.session.id] = sessionPayload(false);
+  DB.put('kv', BK.queue, 'backupQueue').catch(() => {});
+  if (n || S.session) scheduleFlush(1000);
+  renderBackup();
+  return n;
+}
+async function backupNow() {
+  if (!backupOn()) return say('Google Drive backup is not set up. Add the backup URL and secret in Settings when you are parked. Until then your writing is saved on this phone only.');
+  await syncAllDocs();
   BK.queue['d_' + S.doc.id] = docPayload(S.doc);
   const ok = await flushBackups();
   say(ok ? 'Backed up to Google Drive.' : "I couldn't reach Google Drive. I'll keep trying when you have signal.");
@@ -1355,7 +1468,7 @@ function renderStatus() {
 }
 function renderSession() {
   const el = $('#sessionInfo');
-  const bk = backupLine();
+  const bk = [backupLine(), polishLine()].filter(Boolean).join(' · ');
   if (!S.session) { el.textContent = 'No session open' + (bk ? ' · ' + bk : ''); return; }
   const n = S.session.versions.length;
   el.textContent = `Session since ${fmtTime(S.session.startedAt)} · ${n} autosave${n === 1 ? '' : 's'}` + (bk ? ' · ' + bk : '');
@@ -1520,40 +1633,73 @@ function bindSettings() {
   const st = S.settings;
   $('#apiKey').value = st.apiKey; $('#model').value = st.model; $('#lang').value = st.lang;
   $('#rate').value = st.rate; $('#rateVal').textContent = (+st.rate).toFixed(2).replace(/0$/, ''); $('#lwt').checked = st.listenWhileTalking;
-  $('#apiKey').addEventListener('change', e => { st.apiKey = e.target.value.trim(); saveSettings(); });
+  const onKey = e => { st.apiKey = e.target.value.trim(); saveSettings(); PG.warned = false; PG.model = null; setPolishStatus('idle'); };
+  $('#apiKey').addEventListener('input', onKey);
+  $('#apiKey').addEventListener('change', e => { onKey(e); schedulePolish(500); });
   $('#model').addEventListener('change', e => { st.model = e.target.value; saveSettings(); });
   $('#lang').addEventListener('change', e => { st.lang = e.target.value; saveSettings(); if (rec) { try { rec.abort(); } catch (x) {} rec = null; if (wantListen) setTimeout(startRec, 400); } });
   $('#voice').addEventListener('change', e => { st.voice = e.target.value; saveSettings(); });
   $('#rate').addEventListener('input', e => { st.rate = +e.target.value; $('#rateVal').textContent = st.rate.toFixed(2).replace(/0$/, ''); saveSettings(); });
   $('#lwt').addEventListener('change', e => { st.listenWhileTalking = e.target.checked; saveSettings(); });
   $('#autoPunct').checked = st.autoPunct !== false;
-  $('#autoPunct').addEventListener('change', e => { st.autoPunct = e.target.checked; saveSettings(); });
+  $('#autoPunct').addEventListener('change', e => { st.autoPunct = e.target.checked; saveSettings(); PG.warned = false; setPolishStatus('idle'); if (st.autoPunct) schedulePolish(500); });
+  renderPolishNote();
   $('#bkUrl').value = st.backupUrl; $('#bkSecret').value = st.backupSecret;
-  $('#bkUrl').addEventListener('change', e => { st.backupUrl = e.target.value.trim(); saveSettings(); BK.error = ''; renderBackup(); });
-  $('#bkSecret').addEventListener('change', e => { st.backupSecret = e.target.value.trim(); saveSettings(); BK.error = ''; renderBackup(); });
+  const onBk = () => { st.backupUrl = $('#bkUrl').value.trim(); st.backupSecret = $('#bkSecret').value.trim(); saveSettings(); BK.error = ''; renderBackup(); };
+  ['input', 'change'].forEach(ev => { $('#bkUrl').addEventListener(ev, onBk); $('#bkSecret').addEventListener(ev, onBk); });
+  $('#bkUrl').addEventListener('change', () => { if (backupOn()) syncAllDocs(); });
   $('#btnBkTest').addEventListener('click', async e => {
     const b = e.currentTarget, el = $('#bkStatus');
+    onBk();
     if (!backupOn()) { el.textContent = 'Fill in both the URL and the secret first.'; return; }
     b.disabled = true; el.textContent = 'Testing…';
-    try { await postBackup({action: 'ping'}); el.textContent = 'Connected. Zephyr can save to your Google Drive.'; BK.error = ''; renderSession(); }
+    try {
+      await postBackup({action: 'ping'}); BK.error = ''; renderSession();
+      const n = await syncAllDocs();
+      el.textContent = n ? `Connected. Backing up ${n} document${n === 1 ? '' : 's'} that ${n === 1 ? 'was' : 'were'} never backed up…` : 'Connected. Zephyr can save to your Google Drive.';
+      if (n) { const ok = await flushBackups(); el.textContent = ok ? `Connected. ${n} document${n === 1 ? '' : 's'} backed up to Google Drive.` : 'Connected, but some backups are still waiting. Zephyr will keep trying.'; }
+    }
     catch (x) { el.textContent = x instanceof TypeError ? "Couldn't reach the script. Check the URL and that the web app is shared with Anyone." : x.message; }
     b.disabled = false;
   });
-  $('#btnBkNow').addEventListener('click', () => backupNow());
+  $('#btnBkNow').addEventListener('click', () => { onBk(); backupNow(); });
+  $('#btnSetupLink').addEventListener('click', e => copyText(setupLink(), e.currentTarget));
   $('#btnTestVoice').addEventListener('click', () => say('Hello. I am Zephyr. Say Zephyr please, compose when you are ready to write.'));
+}
+
+/* ================= setup link ================= */
+const SETUP_KEYS = ['apiKey', 'model', 'lang', 'voice', 'rate', 'listenWhileTalking', 'backupUrl', 'backupSecret', 'autoPunct'];
+function setupLink() {
+  const o = {}; SETUP_KEYS.forEach(k => { o[k] = S.settings[k]; });
+  const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return location.href.split('#')[0] + '#zsetup=' + b64;
+}
+function readSetupLink() {
+  const m = location.hash.match(/^#zsetup=([A-Za-z0-9_-]+)$/);
+  if (!m) return null;
+  try {
+    const o = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g, '+').replace(/_/g, '/')))));
+    history.replaceState(null, '', location.href.split('#')[0]);
+    const out = {}; SETUP_KEYS.forEach(k => { if (k in o) out[k] = o[k]; });
+    return out;
+  } catch (e) { return null; }
 }
 
 /* ================= boot ================= */
 (async function boot() {
   try { await idb(); }
   catch (e) { showZephyr('This browser blocked storage, so Zephyr cannot save. Open this page in a normal (not private) browser window.'); return; }
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
   const saved = await DB.get('kv', 'settings');
   if (saved) Object.assign(S.settings, saved);
+  const fromLink = readSetupLink();
+  if (fromLink) { Object.assign(S.settings, fromLink); await DB.put('kv', S.settings, 'settings'); }
   bindSettings();
   BK.queue = (await DB.get('kv', 'backupQueue')) || {};
   BK.last = (await DB.get('kv', 'backupLast')) || 0;
   renderBackup();
   if (Object.keys(BK.queue).length) scheduleFlush(3000);
+  if (backupOn()) setTimeout(syncAllDocs, 4000);
   if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
   await purgeArchives();
   const activeId = await DB.get('kv', 'activeSession');
@@ -1573,8 +1719,10 @@ function bindSettings() {
     if (!S.doc) { const docs = await DB.all('docs'); S.doc = docs.sort((a, b) => b.updatedAt - a.updatedAt)[0] || await createDoc('Untitled draft', ''); }
     S.text = S.doc.text || '';
   }
+  S.polishedTo = S.text.length;
   DB.put('kv', S.doc.id, 'lastDoc').catch(() => {});
-  if (!SR) showZephyr('This browser cannot listen. On iPhone use Safari, on Android use Chrome.');
+  if (fromLink) showZephyr('Your settings are back from your setup link.' + (backupOn() ? ' Backing up any documents that were never saved to Google Drive.' : ''));
+  else if (!SR) showZephyr('This browser cannot listen. On iPhone use Safari, on Android use Chrome.');
   else if (!S.settings.apiKey) showZephyr('Composing and read-back work now. Add your Claude API key in Settings to turn on edit, feedback and explain.');
   render();
 })();
