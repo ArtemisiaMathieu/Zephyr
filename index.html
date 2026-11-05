@@ -33,6 +33,7 @@
   color-scheme:light;
 }
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.5 var(--ui);-webkit-text-size-adjust:100%}
 .app{max-width:760px;margin:0 auto;min-height:100%;
@@ -119,6 +120,11 @@ input[type="text"],input[type="password"],input:not([type]),select{background:va
 .list .meta{min-width:0;flex:1}
 .list .t{font-family:var(--read);font-size:1.05rem}
 .list .s{color:var(--muted);font-size:.86rem;font-variant-numeric:tabular-nums}
+.proj{border-bottom:0!important;padding-top:22px!important}
+.proj-name{font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.82rem;color:var(--amber)}
+.proj-name .s{text-transform:none;letter-spacing:0;font-weight:400;margin-left:6px}
+.list > li:not(.proj){padding-left:12px}
+.rw-tag{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--speak);font-weight:700;margin-left:6px}
 .current-tag{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);font-weight:700;margin-left:6px}
 
 details.sess{border-bottom:1px solid var(--line);padding-block:10px}
@@ -178,11 +184,17 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
         <div class="ms-head">
           <span class="eyebrow">Manuscript</span>
           <div class="seg" role="group" aria-label="Manuscript view">
-            <button type="button" id="viewFormatted" aria-pressed="true">Formatted</button>
+            <button type="button" id="viewFormatted" aria-pressed="true">Voice draft</button>
+            <button type="button" id="viewRewrite" aria-pressed="false">Claude rewrite</button>
             <button type="button" id="viewRaw" aria-pressed="false">Edit text</button>
           </div>
         </div>
         <div id="docView" class="rendered"></div>
+        <div id="rewriteView" class="rendered" hidden></div>
+        <div id="rewriteBar" class="row" hidden>
+          <button class="btn small" id="btnRewrite" type="button">Rewrite with Claude</button>
+          <button class="btn small" id="btnCopyRewrite" type="button" data-label="Copy rewrite">Copy rewrite</button>
+        </div>
         <label for="docText" class="sr">Manuscript text</label>
         <textarea hidden id="docText" spellcheck="true" placeholder="Tap Start listening and talk. Everything you say lands here. You can also type here when you’re parked."></textarea>
       </div>
@@ -200,11 +212,28 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
         <button class="btn" id="btnCopyFmt" type="button" data-label="Copy formatted">Copy formatted</button>
         <button class="btn" id="btnCopy" type="button">Copy text</button>
         <button class="btn" id="btnTxt" type="button">Download .txt</button>
+      </div>
+      <div class="field" style="margin-top:16px">
+        <label for="curProject">Project</label>
+        <select id="curProject"></select>
+      </div>
+
+      <h2>New document</h2>
+      <div class="field">
+        <label for="newProject">Save it in</label>
+        <select id="newProject"></select>
+      </div>
+      <div class="field" id="newProjectNameField" hidden>
+        <label for="newProjectName">New project name</label>
+        <input id="newProjectName" type="text" placeholder="For example, What Is a Woman">
+      </div>
+      <div class="row">
         <button class="btn" id="btnFromCurrent" type="button">New from this</button>
         <button class="btn" id="btnBlank" type="button">New blank</button>
       </div>
+
       <h2>All documents</h2>
-      <p class="note">Each document keeps the draft saved at the end of its last session.</p>
+      <p class="note">Grouped by project. In Google Drive each project is its own folder inside the Zephyr folder.</p>
       <ul id="docList" class="list"></ul>
     </section>
 
@@ -236,7 +265,15 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
             <tr><td>Zephyr please apply suggestion 2</td><td>Make that suggested edit. Also “apply suggestions one and three” or “apply all.”</td></tr>
             <tr><td>Zephyr please explain …</td><td>Ask how to edit. “Zephyr please explain how to tighten a long opening.” Questions work too: “Zephyr please how do I show this instead of telling it?”</td></tr>
             <tr><td>Zephyr please undo</td><td>Undo the last change this session. Also “undo all” and “redo.”</td></tr>
-            <tr><td>Zephyr please create new</td><td>Save this document and start a new one that begins with a copy of it. “Create new blank” starts empty.</td></tr>
+            <tr><td>Zephyr please create new</td><td>Save this document and start a new one that begins with a copy of it. Zephyr asks which project: say a project name, or “new project” and a name. “Create new blank” starts empty. You can name it at once: “Zephyr please create new blank in Mycelios.”</td></tr>
+            <tr><td>Zephyr please new project …</td><td>Start a blank document in a new project: “Zephyr please new project Dark Goddess Club.”</td></tr>
+            <tr><td>Zephyr please move to …</td><td>Move this document to another project. “Move to new project …” creates one. “Zephyr please which project” and “list projects” tell you where you are.</td></tr>
+            <tr><th colspan="2">Claude rewrite</th></tr>
+            <tr><td>Zephyr please rewrite document</td><td>When you’re done composing, Claude rewrites the whole draft into finished prose. Add a direction: “Zephyr please rewrite document, more lyrical and tighter.” Your voice draft stays as it is; the rewrite comes after it in the Google Doc. You can keep talking while it works.</td></tr>
+            <tr><td>Zephyr please read rewrite</td><td>Hear the rewritten version.</td></tr>
+            <tr><td>Zephyr please end session and rewrite</td><td>Rewrite, then save and end the session.</td></tr>
+            <tr><td>Zephyr please cancel rewrite</td><td>Stop a rewrite in progress.</td></tr>
+            <tr><th colspan="2">Documents</th></tr>
             <tr><td>Zephyr please rename …</td><td>Rename the current document. Also “Zephyr please call it …”</td></tr>
             <tr><td>Zephyr please open …</td><td>Switch documents by name. “Zephyr please list documents” reads the names.</td></tr>
             <tr><th colspan="2">Formatting</th></tr>
@@ -461,8 +498,37 @@ async function endSession({announce = true, stop = true} = {}) {
   else if (announce) await say('This draft is saved on this phone only, because Google Drive backup is not set up. Add it in Settings when you are parked.');
   if (stop) stopListening();
 }
-async function createDoc(title, text) {
-  const d = {id: uid(), title, text: text || '', createdAt: Date.now(), updatedAt: Date.now()};
+/* ---- projects ---- */
+const DEFAULT_PROJECT = 'General';
+const projectOf = d => (d && d.project) || DEFAULT_PROJECT;
+const cleanName = n => String(n || '').replace(/[.!?]+$/, '').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().replace(/\b\w/g, c => c.toUpperCase());
+async function allProjects() {
+  const set = new Set([DEFAULT_PROJECT, ...((await DB.get('kv', 'projects')) || [])]);
+  for (const d of await DB.all('docs')) set.add(projectOf(d));
+  return [...set].sort((a, b) => a === DEFAULT_PROJECT ? -1 : b === DEFAULT_PROJECT ? 1 : a.localeCompare(b));
+}
+async function addProject(name) {
+  name = cleanName(name);
+  if (!name) return null;
+  const list = (await DB.get('kv', 'projects')) || [];
+  const existing = (await allProjects()).find(p => norm(p) === norm(name));
+  if (existing) return existing;
+  list.push(name); await DB.put('kv', list, 'projects');
+  return name;
+}
+async function findProject(spoken) {
+  const q = norm(spoken).replace(/^(?:the|my|in|into|to)\s+/, '').replace(/\s+(?:project|folder)$/, '').replace(/^(?:project|folder)\s+/, '');
+  if (!q) return null;
+  let best = null, score = 0;
+  for (const p of await allProjects()) {
+    const t = norm(p); let sc = t === q ? 100 : (t.includes(q) || q.includes(t)) ? 50 : 0;
+    for (const w of q.split(' ')) if (w.length > 2 && t.includes(w)) sc += 5;
+    if (sc > score) { score = sc; best = p; }
+  }
+  return score >= 10 ? best : null;
+}
+async function createDoc(title, text, project) {
+  const d = {id: uid(), title, text: text || '', project: project || DEFAULT_PROJECT, createdAt: Date.now(), updatedAt: Date.now()};
   await DB.put('docs', d);
   queueBackup('d_' + d.id, docPayload(d), 5000);
   return d;
@@ -473,13 +539,53 @@ async function openDoc(doc) {
   DB.put('kv', doc.id, 'lastDoc').catch(() => {});
   render(); renderDocs();
 }
-async function createNew(blank) {
+async function createNew(blank, project) {
   const base = S.doc.title, text = S.text;
+  project = project || projectOf(S.doc);
   await endSession({announce: false, stop: false});
-  const d = await createDoc(blank ? 'Untitled draft' : `${base} (new)`, blank ? '' : text);
+  const d = await createDoc(blank ? 'Untitled draft' : `${base} (new)`, blank ? '' : text, project);
   await openDoc(d);
-  say(blank ? `Saved ${base}. Started a blank document.`
-            : `Saved ${base}, and made a new document from it called ${d.title}. You're working in the new one now.`);
+  say(blank ? `Saved ${base}. Started a blank document in ${project}.`
+            : `Saved ${base}, and made a new document from it called ${d.title}, in ${project}. You're working in the new one now.`);
+}
+// Voice: "create new" asks which project, unless one was named.
+let pendingNew = null;
+async function askProjectForNew(blank, rest) {
+  rest = String(rest || '').replace(/\b(?:blank|empty|scratch|fresh|document|doc|draft|one)\b/gi, ' ').trim();
+  let m;
+  if ((m = rest.match(/^(?:in\s+|for\s+)?(?:a\s+)?new project\s*(?:called|named)?\s*(.*)$/i))) return answerProject('new project ' + m[1], {blank});
+  if ((m = rest.match(/^(?:in|into|for|under)\s+(?:the\s+)?(?:project\s+)?(.+)$/i))) return answerProject(m[1], {blank});
+  pendingNew = {blank};
+  const list = await allProjects();
+  setAwait('project', 20000);
+  say(`New ${blank ? 'blank ' : ''}document. Which project? You have ${list.join(', ')}. Or say new project, and its name.`);
+}
+async function answerProject(ans, opts) {
+  const p = opts || pendingNew || {blank: false};
+  pendingNew = null;
+  const a = String(ans).trim().replace(/^(?:zephyr please\s+)?/i, '');
+  let m, proj;
+  if ((m = a.match(/^(?:a\s+)?new project\s*(?:called|named)?[\s,:]*(.*)$/i))) {
+    if (!m[1].trim()) { pendingNew = p; setAwait('projectName', 20000); return say('What should I call the new project?'); }
+    proj = await addProject(m[1]);
+    return createNew(p.blank, proj);
+  }
+  if (/^(?:this|same|the same|current)(?: one| project)?$/i.test(a)) return createNew(p.blank, projectOf(S.doc));
+  proj = await findProject(a);
+  if (proj) return createNew(p.blank, proj);
+  if (words(a) > 6) { dictate(a); return createNew(p.blank, projectOf(S.doc)); }   // she kept writing instead of answering
+  pendingNew = p; setAwait('project', 20000);
+  say(`I don't have a project called ${a}. Say the name again, or say new project ${a} to create it.`);
+}
+async function moveToProject(name, create) {
+  const proj = create ? await addProject(name) : await findProject(name);
+  if (!proj) return say(`I don't have a project called ${name}. Say Zephyr please move to new project ${name} to create it.`);
+  S.doc.project = proj;
+  const stored = await DB.get('docs', S.doc.id);
+  await DB.put('docs', Object.assign(stored || {}, S.doc, {text: stored ? stored.text : S.doc.text}));
+  queueBackup('d_' + S.doc.id, docPayload(Object.assign({}, S.doc, {text: stored ? stored.text : S.doc.text})), 5000);
+  render(); renderDocs();
+  say(`Moved ${S.doc.title} to ${proj}.`);
 }
 async function rename(name) {
   name = String(name).replace(/[.!?]+$/, '').trim();
@@ -1042,7 +1148,14 @@ function wakeMatch(t) {
 }
 const STOPRE = /^(?:stop|quiet|hush|shush|enough|cancel|be quiet|stop talking|shut up)\b/i;
 let awaitTimer = null;
-function setAwait(kind, ms) { S.awaiting = kind; clearTimeout(awaitTimer); awaitTimer = setTimeout(() => { S.awaiting = null; renderStatus(); }, ms || 10000); renderStatus(); }
+function setAwait(kind, ms) {
+  S.awaiting = kind; clearTimeout(awaitTimer);
+  awaitTimer = setTimeout(() => {
+    const k = S.awaiting; S.awaiting = null; renderStatus();
+    if ((k === 'project' || k === 'projectName') && pendingNew) { const p = pendingNew; pendingNew = null; createNew(p.blank, projectOf(S.doc)); }
+  }, ms || 10000);
+  renderStatus();
+}
 function clearAwait() { S.awaiting = null; clearTimeout(awaitTimer); renderStatus(); }
 function afterWake(t) { const m = wakeMatch(t); return m ? t.slice(m.index + m[0].length).replace(/^[\s,.:;!?-]+/, '') : ''; }
 function isEcho(t) {
@@ -1071,6 +1184,12 @@ function handleFinal(raw, typed) {
     if (k === 'edit') return runEdit(t);
     if (k === 'explain') return runExplain(t);
     if (k === 'title') return rename(t);
+    if (k === 'project') return answerProject(t);
+    if (k === 'projectName') return answerProject('new project ' + t);
+    if (k === 'rewrite') {
+      if (words(t) > 12) { dictate(t); return say('I took that as writing. Say Zephyr please rewrite document when you are ready.'); }
+      return startRewrite(/^(?:no|nope|nothing|just do it|go ahead|go|no thanks|none|do it|yes)\b/i.test(t) ? '' : t);
+    }
     return runCommand(t, t);
   }
   if (!m) {
@@ -1085,11 +1204,23 @@ function handleFinal(raw, typed) {
   runCommand(after, t.slice(m.index));
 }
 
-const HELP = 'Everything you say goes into the manuscript. To give a command, start with Zephyr please. Pause, to stop writing for a while. Compose, to start again. Add to manuscript, to keep what you just said. Back up, to save to Google Drive. Scratch that. Read, or read last paragraph. Edit, then what to change. Feedback. Apply suggestion, and a number. Explain, then your question. Undo, or redo. Create new. Rename, then a name. Open, then a document name. Formatting help, for titles, headings, lists, bold, italic and underline. Word count. Repeat. Stop, to silence me. And end session, to save your draft.';
+const HELP = 'Everything you say goes into the manuscript. To give a command, start with Zephyr please. Pause, to stop writing for a while. Compose, to start again. Add to manuscript, to keep what you just said. Back up, to save to Google Drive. Scratch that. Read, or read last paragraph. Edit, then what to change. Feedback. Apply suggestion, and a number. Explain, then your question. Undo, or redo. Create new, and I will ask which project. New project, then a name. Move to, then a project name. Rewrite document, to have Claude rewrite your draft. Read rewrite. Rename, then a name. Open, then a document name. Formatting help, for titles, headings, lists, bold, italic and underline. Word count. Repeat. Stop, to silence me. And end session, to save your draft.';
 
 const FORMAT_HELP = 'Formatting commands. Say Zephyr please, then: Title. Heading one, two, three or four. Normal text. Bulleted list. Numbered list. End list. New paragraph. New line. Bold, italic or underline, followed by that, last sentence, last word, or the words you want. Say bold on, then bold off, to format as you talk. Remove bold, or remove formatting, to undo it. You can add words right after a style, like: Zephyr please heading two, chapter one.';
 const KEEP = true;
 const COMMANDS = [
+  [/^new project\b\s*(?:called|named)?[\s,:]*(.*)$/i, m => answerProject('new project ' + m[1], {blank: true})],
+  [/^(?:create|make|start)\s+(?:a\s+)?new project\b\s*(?:called|named)?[\s,:]*(.*)$/i, m => answerProject('new project ' + m[1], {blank: true})],
+  [/^(?:create|make|start)\s+(?:a\s+)?new\b\s*(.*)$/i, m => askProjectForNew(/blank|empty|scratch|fresh/i.test(m[1]), m[1])],
+  [/^(?:move|put|file|save)\s+(?:this|it|the document|this document)?\s*(?:to|in|into|under)\s+(?:a\s+)?new project\s*(?:called|named)?[\s,:]*(.+)$/i, m => moveToProject(m[1], true)],
+  [/^(?:move|file)\s+(?:this|it|the document|this document)?\s*(?:to|in|into|under)\s+(?:the\s+)?(?:project\s+)?(.+)$/i, m => moveToProject(m[1], false)],
+  [/^(?:which|what) project\b/i, () => say(`${S.doc.title} is in ${projectOf(S.doc)}.`)],
+  [/^(?:list|what are)\s+(?:my\s+|the\s+)?projects\b/i, async () => say(`Your projects are ${(await allProjects()).join(', ')}.`)],
+  [/^(?:read|read back|read me|play)\s+(?:the\s+)?(?:rewrite|rewritten version|claude version|new version)\b/i, () => readRewrite()],
+  [/^(?:cancel|stop)\s+(?:the\s+)?rewrite\b/i, () => cancelRewrite()],
+  [/^(?:end|finish|close)\s+(?:the\s+|my\s+|this\s+)?session\s+and\s+rewrite\b[\s,:]*(.*)$/i, m => startRewrite(m[1], {endAfter: true})],
+  [/^(?:rewrite|re-write|polish|redo)\s*(?:the\s+|my\s+|this\s+)?(?:whole\s+|entire\s+)?(?:document|draft|piece|essay|story|manuscript|thing|it all|everything|all of it|it)?\s*$/i, () => { setAwait('rewrite', 12000); say('Any direction for the rewrite? For example, more lyrical, or tighter. Or say go ahead.'); }],
+  [/^(?:rewrite|re-write|polish)\s+(?:the\s+|my\s+|this\s+)?(?:whole\s+|entire\s+)?(?:document|draft|piece|essay|story|manuscript|thing|it all|everything|all of it)\b[\s,:]*(.*)$/i, m => startRewrite(m[1])],
   [/^(?:end|finish|close|save and end)\s+(?:the\s+|my\s+|this\s+)?session\b/i, () => endSession()],
   [/^(?:back ?up|backup|save to drive|sync)\b/i, () => backupNow()],
   [/^(?:add|put|keep|save)\s+(?:that|it|this|what i (?:just )?said)?\s*(?:to|in|into|on)?\s*(?:the\s+)?(?:manuscript|document|draft)\b[\s,:]*(.*)$/i, m => addToManuscript(m[1])],
@@ -1121,7 +1252,6 @@ const COMMANDS = [
   [/^(?:edit|revise|rewrite|change|fix|replace|cut|move|add|insert|delete|remove)\b/i, (m, c) => runEdit(c.replace(/^(?:edit|revise)\b[\s,:]*/i, ''))],
   [/^(?:feedback|critique|give me (?:some )?feedback|suggest(?:ions| edits| changes)?|review(?: it| this| the draft)?)\b\s*(?:on|about|for)?\s*(.*)$/i, m => runFeedback(m[1])],
   [/^(?:explain|teach me|help me understand)\b[\s,:]*(.*)$/i, m => runExplain(m[1])],
-  [/^(?:create|make|start)\s+(?:a\s+)?new\b\s*(.*)$/i, m => createNew(/blank|empty|scratch|fresh/i.test(m[1]))],
   [/^(?:rename|re-name|call (?:it|this|the document)|name (?:it|this|the document))\b\s*(?:this|it|the document|the doc|this document)?\s*(?:to|as)?\s*(.*)$/i, m => { if (m[1].trim()) return rename(m[1]); setAwait('title', 15000); return say('What should I call it?'); }],
   [/^(?:list|what are)\s+(?:my\s+|the\s+)?(?:documents|docs|drafts|files)\b/i, () => listDocs()],
   [/^(?:open|switch to|go to|load)\s+(.+)$/i, m => openByName(m[1])],
@@ -1223,7 +1353,7 @@ async function withBusy(label, fn) {
 }
 const MARKUP_NOTE = 'The document uses formatting marks: a line starting with "% " is the title, "# " to "#### " are headings one to four, "- " is a bullet, "1. " is a numbered item, **bold**, *italic*, ++underline++. Keep these marks unless the instruction is about formatting; use them when it is. Never read the marks aloud or mention them by name.';
 const VOICE_RULES = 'Everything you say is read aloud by text-to-speech to a writer who is driving. Use plain spoken sentences. No markdown, no bullet symbols, no emoji, no headings.';
-const COMMAND_LIST = 'Every command starts with Zephyr please. Commands she can say: Zephyr please compose (everything she says then goes into the manuscript), Zephyr please pause, Zephyr please scratch that, Zephyr please read (or read last paragraph, read paragraph three), Zephyr please edit followed by the change, Zephyr please feedback, Zephyr please apply suggestion and a number, Zephyr please explain followed by a question, Zephyr please undo, Zephyr please redo, Zephyr please create new, Zephyr please rename, Zephyr please open, Zephyr please end session. Formatting: Zephyr please title, Zephyr please heading one to four, Zephyr please normal text, Zephyr please bulleted list, Zephyr please numbered list, Zephyr please new paragraph, Zephyr please bold or italic or underline followed by that, last sentence or the words, Zephyr please remove formatting.';
+const COMMAND_LIST = 'Every command starts with Zephyr please. Commands she can say: Zephyr please compose (everything she says then goes into the manuscript), Zephyr please pause, Zephyr please scratch that, Zephyr please read (or read last paragraph, read paragraph three), Zephyr please edit followed by the change, Zephyr please feedback, Zephyr please apply suggestion and a number, Zephyr please explain followed by a question, Zephyr please undo, Zephyr please redo, Zephyr please create new (she then chooses a project), Zephyr please new project, Zephyr please move to a project, Zephyr please rewrite document (Claude rewrites the whole draft; the original is kept), Zephyr please read rewrite, Zephyr please rename, Zephyr please open, Zephyr please end session. Formatting: Zephyr please title, Zephyr please heading one to four, Zephyr please normal text, Zephyr please bulleted list, Zephyr please numbered list, Zephyr please new paragraph, Zephyr please bold or italic or underline followed by that, last sentence or the words, Zephyr please remove formatting.';
 function editSystem(forceFull) {
   return `You are the editing engine inside Zephyr, a voice writing assistant. Apply the writer's spoken edit instruction to her document.
 Change only what the instruction requires and keep every other character exactly as it is. Preserve her voice and style. The instruction was transcribed from speech, so read past obvious mishearings. Phrases like "that sentence" or "what I just said" usually point to the most recent dictation or the passage most recently read aloud, both provided.
@@ -1331,6 +1461,62 @@ async function runExplain(q) {
   });
 }
 
+/* ================= Claude rewrite ================= */
+// The voice draft stays as it is. The rewrite is stored beside it and goes after it in the Google Doc.
+const RW = {running: false, abort: null};
+const REWRITE_SYS = `You are the editor for a writer who drafts by speaking while she drives. Rewrite her voice draft into finished, publishable prose.
+Keep her meaning, ideas, voice, point of view and the order of her argument or story. Keep her strongest phrases. Remove spoken filler, false starts and repetition, fix grammar, and make the sentences and paragraphs flow.
+Do not add facts, events, quotations or claims she did not make. Do not summarize or shorten it into an outline.
+If she gave a direction in <direction>, follow it.
+The text uses formatting marks: a line starting with "% " is the title, "# " to "#### " are headings one to four, "- " is a bullet, "1. " is a numbered item, **bold**, *italic*, ++underline++. Keep her title and headings, and use these marks for any structure you keep. Separate paragraphs with a blank line.
+If <rewritten_so_far> is given, you are continuing a longer piece: carry on smoothly from it and do not repeat it.
+Reply with only the rewritten text inside <rewrite></rewrite>.`;
+function rewriteChunks(text) {
+  const paras = text.split(/\n{2,}/), out = []; let cur = [], n = 0;
+  for (const p of paras) { const w = words(p); if (cur.length && n + w > 2500) { out.push(cur.join('\n\n')); cur = []; n = 0; } cur.push(p); n += w; }
+  if (cur.length) out.push(cur.join('\n\n'));
+  return out;
+}
+async function startRewrite(direction, opts = {}) {
+  direction = String(direction || '').replace(/^(?:to be|to make it|make it|so it'?s|so that it is|as|in|with|and)\s+/i, '').trim();
+  if (!S.text.trim()) return say('There is nothing to rewrite yet.');
+  if (!S.settings.apiKey) return say('I need your Claude API key for rewrites. Add it in Settings when you are parked.');
+  if (RW.running) return say("I'm already rewriting. I'll tell you when it's ready.");
+  const docId = S.doc.id, source = S.text, title = S.doc.title, chunks = rewriteChunks(source);
+  RW.running = true; RW.abort = new AbortController(); renderRewriteView();
+  say(`Rewriting ${title}${direction ? ', ' + direction : ''}. Keep talking if you like; I'll tell you when it's ready.`);
+  try {
+    let done = '';
+    for (const c of chunks) {
+      const user = (direction ? `<direction>${direction}</direction>\n` : '') + (done ? `<rewritten_so_far>${done.slice(-3000)}</rewritten_so_far>\n` : '') + `<draft>\n${c}\n</draft>`;
+      const out = await callClaude(REWRITE_SYS, user, 16000, {signal: RW.abort.signal, timeout: 240000});
+      const r = tag(out, 'rewrite');
+      if (r === null) throw new Error('Claude sent back something I could not use. Try the rewrite again.');
+      done += (done ? '\n\n' : '') + r.trim();
+    }
+    // save the voice draft as it was when the rewrite started, plus the rewrite
+    const d = (await DB.get('docs', docId)) || (S.doc.id === docId ? S.doc : null);
+    if (!d) throw new Error('That document was deleted while I was rewriting it.');
+    d.text = source; d.updatedAt = Date.now();
+    d.rewrite = {text: done, at: Date.now(), direction, words: words(done)};
+    await DB.put('docs', d);
+    if (S.doc.id === docId) { S.doc.text = d.text; S.doc.rewrite = d.rewrite; S.doc.updatedAt = d.updatedAt; }
+    queueBackup('d_' + docId, docPayload(d), 0); if (backupOn()) flushBackups();
+    RW.running = false; renderRewriteView(); renderDocs();
+    await say(`The rewrite of ${title} is ready, ${words(done)} words. Say Zephyr please read rewrite to hear it.${backupOn() ? ' It goes after your original in Google Drive.' : ''}`);
+    if (opts.endAfter && S.doc.id === docId) await endSession();
+  } catch (e) {
+    RW.running = false; renderRewriteView();
+    await say(e.name === 'AbortError' ? 'Rewrite cancelled.' : 'The rewrite did not finish. ' + e.message);
+  } finally { RW.running = false; RW.abort = null; renderRewriteView(); }
+}
+function cancelRewrite() { if (!RW.running) return say('No rewrite is running.'); RW.abort && RW.abort.abort(); }
+function readRewrite() {
+  if (RW.running) return say("The rewrite isn't ready yet. I'll tell you when it is.");
+  if (!S.doc.rewrite) return say('This document has no rewrite yet. Say Zephyr please rewrite document.');
+  return readAloud(S.doc.rewrite.text);
+}
+
 /* ================= documents by voice ================= */
 async function listDocs() {
   const docs = (await DB.all('docs')).sort((a, b) => b.updatedAt - a.updatedAt);
@@ -1359,7 +1545,8 @@ const BK = {queue: {}, flushing: false, timer: null, due: 0, last: 0, error: ''}
 const backupOn = () => !!(S.settings.backupUrl && S.settings.backupSecret);
 const pad = n => String(n).padStart(2, '0');
 function stamp(t) { const d = new Date(t); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}.${pad(d.getMinutes())}`; }
-const docPayload = d => ({action: 'saveDoc', docId: d.id, title: d.title, text: d.text || ''});
+const docPayload = d => ({action: 'saveDoc', docId: d.id, title: d.title, project: projectOf(d), text: d.text || '',
+  rewrite: d.rewrite ? d.rewrite.text : '', rewriteAt: d.rewrite ? d.rewrite.at : 0, rewriteDirection: d.rewrite ? d.rewrite.direction || '' : ''});
 const sessionPayload = ended => ({action: 'sessionBackup', sessionId: S.session.id, label: `${stamp(S.session.startedAt)} ${S.doc.title}`, text: S.text, ended});
 function scheduleFlush(delay) {
   const due = Date.now() + delay;
@@ -1512,7 +1699,7 @@ function render(fromTextarea) {
   if (!fromTextarea) $('#docText').value = S.text;
   $('#docView').innerHTML = S.text.trim() ? renderDocHTML(S.text) : '<p class="pending">Tap Start listening and talk. Everything you say lands here.</p>';
   if (document.activeElement !== $('#titleInput')) $('#titleInput').value = S.doc ? S.doc.title : '';
-  renderStatus(); renderSession();
+  renderStatus(); renderSession(); renderRewriteView();
 }
 function renderSuggestions() {
   const box = $('#sugg');
@@ -1522,12 +1709,23 @@ function renderSuggestions() {
 let confirmDel = null;
 async function renderDocs() {
   const docs = (await DB.all('docs')).sort((a, b) => b.updatedAt - a.updatedAt);
-  $('#docList').innerHTML = docs.map(d => {
-    const cur = S.doc && d.id === S.doc.id;
-    return `<li><div class="meta"><div class="t">${esc(d.title)}${cur ? '<span class="current-tag">Open</span>' : ''}</div>
-      <div class="s">${words(d.text)} words saved · ${fmtDate(d.updatedAt)} ${fmtTime(d.updatedAt)}</div></div>
-      <div class="row">${cur ? '' : `<button class="btn small" data-open="${d.id}" type="button">Open</button>
-      <button class="btn small danger" data-del="${d.id}" type="button">${confirmDel === d.id ? 'Tap again to delete' : 'Delete'}</button>`}</div></li>`;
+  const projects = await allProjects();
+  const opts = sel => projects.map(p => `<option value="${esc(p)}"${p === sel ? ' selected' : ''}>${esc(p)}</option>`).join('');
+  const cur = S.doc ? projectOf(S.doc) : DEFAULT_PROJECT;
+  $('#curProject').innerHTML = opts(cur);
+  const keepNew = $('#newProject').value;
+  $('#newProject').innerHTML = opts(projects.includes(keepNew) ? keepNew : cur) + '<option value="__new">New project…</option>';
+  if (keepNew === '__new') $('#newProject').value = '__new';
+  $('#newProjectNameField').hidden = $('#newProject').value !== '__new';
+  $('#docList').innerHTML = projects.map(p => {
+    const inP = docs.filter(d => projectOf(d) === p);
+    return `<li class="proj"><div class="proj-name">${esc(p)} <span class="s">${inP.length} document${inP.length === 1 ? '' : 's'}</span></div></li>` + inP.map(d => {
+      const open = S.doc && d.id === S.doc.id;
+      return `<li><div class="meta"><div class="t">${esc(d.title)}${open ? '<span class="current-tag">Open</span>' : ''}${d.rewrite ? '<span class="rw-tag">Rewrite</span>' : ''}</div>
+        <div class="s">${words(d.text)} words saved · ${fmtDate(d.updatedAt)} ${fmtTime(d.updatedAt)}</div></div>
+        <div class="row">${open ? '' : `<button class="btn small" data-open="${d.id}" type="button">Open</button>
+        <button class="btn small danger" data-del="${d.id}" type="button">${confirmDel === d.id ? 'Tap again to delete' : 'Delete'}</button>`}</div></li>`;
+    }).join('');
   }).join('');
 }
 let archiveCache = [];
@@ -1555,14 +1753,33 @@ $('#typeCmd').addEventListener('submit', e => {
   $('#cmdInput').value = '';
   if (wakeMatch(v)) handleFinal(v, true); else { stopSpeaking(); runCommand(v); }
 });
-function setView(raw) {
-  $('#viewFormatted').setAttribute('aria-pressed', String(!raw));
-  $('#viewRaw').setAttribute('aria-pressed', String(raw));
-  $('#docView').hidden = raw; $('#docText').hidden = !raw;
-  if (!raw) render();
+let curView = 'draft';
+function setView(v) {
+  if (v === true) v = 'raw'; if (v === false) v = 'draft';
+  curView = v;
+  $('#viewFormatted').setAttribute('aria-pressed', String(v === 'draft'));
+  $('#viewRewrite').setAttribute('aria-pressed', String(v === 'rewrite'));
+  $('#viewRaw').setAttribute('aria-pressed', String(v === 'raw'));
+  $('#docView').hidden = v !== 'draft'; $('#docText').hidden = v !== 'raw';
+  $('#rewriteView').hidden = v !== 'rewrite'; $('#rewriteBar').hidden = v !== 'rewrite';
+  if (v === 'draft') render();
+  renderRewriteView();
 }
-$('#viewFormatted').addEventListener('click', () => setView(false));
-$('#viewRaw').addEventListener('click', () => setView(true));
+function renderRewriteView() {
+  const el = $('#rewriteView'); if (!el || !S.doc) return;
+  const r = S.doc.rewrite;
+  if (RW.running) el.innerHTML = '<p class="pending">Claude is rewriting this document. Zephyr will tell you when it’s ready.</p>';
+  else if (!r) el.innerHTML = '<p class="pending">No rewrite yet. Say “Zephyr please rewrite document,” or tap Rewrite with Claude below. Your voice draft stays as it is.</p>';
+  else el.innerHTML = `<p class="pending">Rewritten ${fmtDate(r.at)} ${fmtTime(r.at)}${r.direction ? ' · ' + esc(r.direction) : ''} · ${r.words} words. It comes after your voice draft in Google Drive.</p>` + renderDocHTML(r.text);
+  $('#btnRewrite').textContent = r ? 'Rewrite again' : 'Rewrite with Claude';
+  $('#btnRewrite').disabled = RW.running;
+  $('#btnCopyRewrite').hidden = !r;
+}
+$('#viewFormatted').addEventListener('click', () => setView('draft'));
+$('#viewRewrite').addEventListener('click', () => setView('rewrite'));
+$('#viewRaw').addEventListener('click', () => setView('raw'));
+$('#btnRewrite').addEventListener('click', () => startRewrite(''));
+$('#btnCopyRewrite').addEventListener('click', e => S.doc.rewrite && copyText(plain(S.doc.rewrite.text), e.currentTarget));
 let typeTimer = null;
 $('#docText').addEventListener('input', () => {
   clearTimeout(typeTimer);
@@ -1578,8 +1795,16 @@ document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click
 }));
 $('#titleInput').addEventListener('change', async e => { const v = e.target.value.trim(); if (v && v !== S.doc.title) { S.doc.title = v; await DB.put('docs', S.doc); queueBackup('d_' + S.doc.id, docPayload(S.doc), 5000); if (S.session) { S.session.docTitle = v; saveSession(); } render(); renderDocs(); } });
 $('#btnEnd').addEventListener('click', () => endSession({announce: true, stop: true}));
-$('#btnFromCurrent').addEventListener('click', () => createNew(false));
-$('#btnBlank').addEventListener('click', () => createNew(true));
+$('#newProject').addEventListener('change', () => { $('#newProjectNameField').hidden = $('#newProject').value !== '__new'; if (!$('#newProjectNameField').hidden) $('#newProjectName').focus(); });
+async function pickedProject() {
+  if ($('#newProject').value !== '__new') return $('#newProject').value;
+  const name = $('#newProjectName').value.trim();
+  if (!name) { $('#newProjectName').focus(); showZephyr('Type a name for the new project first.'); return null; }
+  const p = await addProject(name); $('#newProjectName').value = ''; return p;
+}
+$('#btnFromCurrent').addEventListener('click', async () => { const p = await pickedProject(); if (p) createNew(false, p); });
+$('#btnBlank').addEventListener('click', async () => { const p = await pickedProject(); if (p) createNew(true, p); });
+$('#curProject').addEventListener('change', e => moveToProject(e.target.value, false));
 async function copyText(text, btn) {
   try { await navigator.clipboard.writeText(text); btn.textContent = 'Copied'; }
   catch (e) { const ta = $('#docText'); ta.focus(); ta.select(); btn.textContent = 'Selected, copy it'; }
@@ -1700,6 +1925,11 @@ function readSetupLink() {
   renderBackup();
   if (Object.keys(BK.queue).length) scheduleFlush(3000);
   if (backupOn()) setTimeout(syncAllDocs, 4000);
+  if (backupOn()) postBackup({action: 'listProjects'}).then(async j => {
+    if (!j || !Array.isArray(j.projects)) return;
+    for (const p of j.projects) await addProject(p);
+    renderDocs();
+  }).catch(() => {});
   if ('speechSynthesis' in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
   await purgeArchives();
   const activeId = await DB.get('kv', 'activeSession');
