@@ -348,11 +348,11 @@ details.ver > summary{cursor:pointer;color:var(--ink);font-size:.95rem;font-vari
       <p class="note">Zephyr sends the working draft to Drive every couple of minutes while you write, and the saved draft at the end of each session. Saved drafts become Google Docs in a Zephyr folder. Session backups go to Zephyr › Session backups and are deleted after seven days.</p>
       <div class="field">
         <label for="bkUrl">Backup web app URL</label>
-        <input id="bkUrl" type="text" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+        <input id="bkUrl" type="text" inputmode="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="field">
         <label for="bkSecret">Backup secret</label>
-        <input id="bkSecret" type="password" placeholder="The same phrase you put in the script" autocomplete="off">
+        <input id="bkSecret" type="text" placeholder="The same phrase you put in the script" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
       </div>
       <div class="row">
         <button class="btn" id="btnBkTest" type="button">Test connection</button>
@@ -1561,12 +1561,20 @@ function queueBackup(key, payload, delay) {
   scheduleFlush(delay == null ? 90000 : delay);
   renderBackup();
 }
+const SCRIPT_VERSION_NEEDED = 4;
+const DEPLOY_STEPS = 'In Apps Script, click Save, then Deploy, Manage deployments, the pencil icon, Version: New version, Deploy.';
+function backupErrorText(j) {
+  if (j.error === 'placeholder') return 'The script is working, but its SECRET line still says CHANGE-ME. Pasting in the new code reset it. Put your phrase between the quotes on that line. ' + DEPLOY_STEPS;
+  if (j.error === 'Wrong secret' && !(j.version >= SCRIPT_VERSION_NEEDED)) return 'Google is still running an older copy of your script, so your latest changes, including the SECRET line, are not live yet. ' + DEPLOY_STEPS;
+  if (j.error === 'Wrong secret') return 'The phrase in Zephyr does not match the SECRET line in the script. Capital letters, spaces and dashes are ignored, so look for a different word or letter. If you just changed the SECRET line: ' + DEPLOY_STEPS;
+  return j.error || 'Backup failed.';
+}
 async function postBackup(payload) {
   const r = await fetch(S.settings.backupUrl, {method: 'POST', headers: {'content-type': 'text/plain;charset=utf-8'},
     body: JSON.stringify(Object.assign({secret: S.settings.backupSecret}, payload))});
   let j = null;
   try { j = await r.json(); } catch (e) { throw new Error('The backup address did not answer like the Zephyr script. Check the web app URL.'); }
-  if (!j.ok) throw new Error(j.error === 'Wrong secret' ? 'The backup secret does not match the one in the script.' : (j.error || 'Backup failed.'));
+  if (!j.ok) throw new Error(backupErrorText(j));
   return j;
 }
 async function flushBackups() {
@@ -1879,12 +1887,13 @@ function bindSettings() {
     if (!backupOn()) { el.textContent = 'Fill in both the URL and the secret first.'; return; }
     b.disabled = true; el.textContent = 'Testing…';
     try {
-      await postBackup({action: 'ping'}); BK.error = ''; renderSession();
+      const pong = await postBackup({action: 'ping'}); BK.error = ''; renderSession();
+      if (!(pong.version >= SCRIPT_VERSION_NEEDED)) { el.textContent = 'Connected, but Google is running an older copy of your script, so project folders and rewrites won’t reach Drive yet. ' + DEPLOY_STEPS; b.disabled = false; return; }
       const n = await syncAllDocs();
       el.textContent = n ? `Connected. Backing up ${n} document${n === 1 ? '' : 's'} that ${n === 1 ? 'was' : 'were'} never backed up…` : 'Connected. Zephyr can save to your Google Drive.';
       if (n) { const ok = await flushBackups(); el.textContent = ok ? `Connected. ${n} document${n === 1 ? '' : 's'} backed up to Google Drive.` : 'Connected, but some backups are still waiting. Zephyr will keep trying.'; }
     }
-    catch (x) { el.textContent = x instanceof TypeError ? "Couldn't reach the script. Check the URL and that the web app is shared with Anyone." : x.message; }
+    catch (x) { el.textContent = x instanceof TypeError ? "Couldn't reach the script. Check that the URL ends in /exec, and that the deployment's “Who has access” is set to Anyone." : x.message; }
     b.disabled = false;
   });
   $('#btnBkNow').addEventListener('click', () => { onBk(); backupNow(); });
